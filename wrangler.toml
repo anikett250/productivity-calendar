@@ -1,0 +1,21 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "productivity-calendar"
+type = "javascript"
+account_id = ""
+workers_dev = true
+routes = []
+zones = []
+build = { command = "npm run pages:build" }
+
+[env.production]
+name = "productivity-calendar-prod"
+route = ""
+zone_id = ""
+
+[build.upload]
+format = "service-worker"
+
+[build.upload.rules]
+type = "CompiledContentType"
+globs = ["**/*.wasm"]
+fallthrough = true

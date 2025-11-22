@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import clientPromise from "../../../lib/mongodb";
+import jwt from "jsonwebtoken";
 
 export async function POST(req: Request) {
     try {
@@ -29,6 +30,18 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
         }
 
+        // Create NextAuth JWT token
+        const token = jwt.sign(
+            {
+                email: existingUser.email,
+                userId: existingUser.userId,
+                name: existingUser.name,
+                sub: existingUser.userId,
+            },
+            process.env.NEXTAUTH_SECRET || "",
+            { expiresIn: "7d" }
+        );
+
         // Success - create response with cookie
         const response = NextResponse.json({ 
             message: "Login successful", 
@@ -39,7 +52,18 @@ export async function POST(req: Request) {
             } 
         });
 
-        // Set secure httpOnly cookie with user info
+        // Set NextAuth token cookie (this is what NextAuth expects)
+        response.cookies.set({
+            name: 'next-auth.session-token',
+            value: token,
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 7, // 7 days
+            path: '/'
+        });
+
+        // Also set custom cookie for backward compatibility
         response.cookies.set({
             name: 'user_session',
             value: JSON.stringify({

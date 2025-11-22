@@ -1,0 +1,4 @@
+/*
+  This is a placeholder for Cloudflare Workers configuration.
+  Cloudflare Pages automatically handles Next.js API routes.
+*/
