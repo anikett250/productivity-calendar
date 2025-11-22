@@ -47,7 +47,7 @@ export default function SignupPage() {
             } else {
                 setMessage(data.message || "Signup failed. Please try again.");
             }
-        } catch (error) {
+        } catch {
             setMessage("An error occurred. Please try again.");
         } finally {
             setLoading(false);

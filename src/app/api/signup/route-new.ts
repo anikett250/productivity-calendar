@@ -1,12 +1,13 @@
 import clientPromise from "../../../lib/mongodb";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
+import type { NextRequest } from "next/server";
 
 function generateUniqueUserId(): string {
   return `user_${uuidv4()}`;
 }
 
-export async function POST(req: RequestInit) {
+export async function POST(req: NextRequest) {
   try {
     const { name, email, password } = await req.json();
 

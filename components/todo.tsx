@@ -32,6 +32,8 @@ interface ServerTodo {
     time: string | number;
     date: string;
     label: string;
+    start?: string | null;
+    end?: string | null;
 }
 
 export default function Todo() {
@@ -44,7 +46,7 @@ export default function Todo() {
         end: '',
         label: 'Dev'
     });
-    const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+    const [editingTodo, setEditingTodo] = useState<ServerTodo | null>(null);
     // removed duplicate `Todo` state which conflicted with component name
 
     const getLabelColor = (label: string) => {

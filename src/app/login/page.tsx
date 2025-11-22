@@ -36,7 +36,7 @@ export default function LoginPage() {
       } else {
         setMessage(data.error || "Login failed");
       }
-    } catch (error) {
+    } catch {
       setMessage("An error occurred. Please try again.");
     } finally {
       setLoading(false);

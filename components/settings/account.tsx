@@ -4,11 +4,7 @@ import Image from "next/image";
 import { ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 
-interface Props {
-  onClose: () => void;
-}
-
-export default function SettingsAccount({ onClose }: Props) {
+export default function SettingsAccount() {
   const user = {
     plan: "Beginner",
     name: "Aniket Tiwari",
@@ -78,7 +74,7 @@ export default function SettingsAccount({ onClose }: Props) {
         </button>
 
         <p className="text-xs text-gray-400 mt-1 mb-6">
-          To keep your account details secure, we'll take you to the browser to make changes.
+          To keep your account details secure, we&apos;ll take you to the browser to make changes.
         </p>
 
         {/* Footer Links */}
