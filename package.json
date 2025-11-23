@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.11.1",
+    "@types/jsonwebtoken": "^9.0.10",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.22",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.544.0",
     "mongoose": "^8.19.2",
     "next": "15.5.4",
