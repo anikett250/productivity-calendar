@@ -30,7 +30,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
         }
 
-        // Create NextAuth JWT token
+        // Create JWT token
         const token = jwt.sign(
             {
                 email: existingUser.email,
@@ -52,13 +52,13 @@ export async function POST(req: Request) {
             } 
         });
 
-        // Set NextAuth token cookie (this is what NextAuth expects)
+        // Set NextAuth token cookie
         response.cookies.set({
             name: 'next-auth.session-token',
             value: token,
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'lax',
             maxAge: 60 * 60 * 24 * 7, // 7 days
             path: '/'
         });
@@ -73,14 +73,14 @@ export async function POST(req: Request) {
             }),
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'lax',
             maxAge: 60 * 60 * 24 * 7, // 7 days
             path: '/'
         });
 
         return response;
     } catch (err) {
-        console.error(err);
+        console.error("Login error:", err);
         return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
     }
 }
