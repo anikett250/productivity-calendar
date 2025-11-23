@@ -6,6 +6,19 @@ import type { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import clientPromise from './mongodb';
 
+// Dynamic NEXTAUTH_URL - use environment variable or auto-detect from request
+const getAuthUrl = () => {
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL;
+  }
+  // Fallback for Vercel: use the VERCEL_URL if available
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  // Fallback for local development
+  return "http://localhost:3000";
+};
+
 export const authOptions: NextAuthOptions = {
   providers: [
     // Google login
@@ -37,6 +50,10 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   secret: process.env.NEXTAUTH_SECRET,
+  // Use dynamic URL detection for Vercel compatibility
+  ...(getAuthUrl() && { 
+    trustHost: true,
+  }),
 }
 
 // Dummy function for example

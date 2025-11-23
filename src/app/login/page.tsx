@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react"
 
 export default function LoginPage() {
@@ -10,7 +9,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,21 +21,27 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: 'include', // Important: include cookies in the request
       });
 
       const data = await res.json();
 
       if (res.ok) {
         setMessage(data.message || "Login successful");
-        // Redirect after a short delay to show the success message
+        console.log("Login successful, cookies set");
+        
+        // Wait a moment to ensure cookies are set, then hard redirect
+        // This ensures the middleware can read the cookies on the next request
         setTimeout(() => {
-          router.push("/calendar");
-        }, 500);
+          window.location.href = "/calendar";
+        }, 1500);
       } else {
         setMessage(data.error || "Login failed");
+        console.error("Login failed:", data.error);
       }
-    } catch {
+    } catch (error) {
       setMessage("An error occurred. Please try again.");
+      console.error("Login error:", error);
     } finally {
       setLoading(false);
     }
