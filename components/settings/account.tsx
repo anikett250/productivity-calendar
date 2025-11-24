@@ -3,13 +3,58 @@
 import Image from "next/image";
 import { ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+
+interface UserSession {
+  name?: string;
+  email?: string;
+}
+
+const DefaultUserIcon = () => (
+  <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="#000000" className="w-[70px] h-[70px]">
+    <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
+    <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g>
+    <g id="SVGRepo_iconCarrier">
+      <path d="m 8 1 c -1.65625 0 -3 1.34375 -3 3 s 1.34375 3 3 3 s 3 -1.34375 3 -3 s -1.34375 -3 -3 -3 z m -1.5 7 c -2.492188 0 -4.5 2.007812 -4.5 4.5 v 0.5 c 0 1.109375 0.890625 2 2 2 h 8 c 1.109375 0 2 -0.890625 2 -2 v -0.5 c 0 -2.492188 -2.007812 -4.5 -4.5 -4.5 z m 0 0" fill="#7e7e7e"></path>
+    </g>
+  </svg>
+);
 
 export default function SettingsAccount() {
+  const { data: session } = useSession();
+  const [userSession, setUserSession] = useState<UserSession | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check for custom user_session cookie
+    const fetchUserSession = async () => {
+      try {
+        const response = await fetch("/api/get-user-session");
+        if (response.ok) {
+          const data = await response.json();
+          setUserSession(data);
+        }
+      } catch (error) {
+        console.error("Error fetching user session:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserSession();
+  }, []);
+
+  // Determine which user data to display
+  const displayName = session?.user?.name || userSession?.name || "User";
+  const displayEmail = session?.user?.email || userSession?.email || "No email";
+  const isGoogleLogin = !!session?.user?.image;
+  const photoUrl = session?.user?.image;
+
   const user = {
     plan: "Beginner",
-    name: "Aniket Tiwari",
-    email: "cyberninjahindustani@gmail.com",
-    photo: "/profile.jpg",
+    name: displayName,
+    email: displayEmail,
   };
 
   return (
@@ -46,13 +91,26 @@ export default function SettingsAccount() {
         {/* Photo */}
         <div className="mb-6">
           <p className="text-sm font-medium text-[#303030]  mb-2">Photo</p>
-          <Image
-            src={user.photo}
-            width={70}
-            height={70}
-            alt="Profile"
-            className="rounded-md object-cover"
-          />
+          {!loading && (
+            <>
+              {isGoogleLogin && photoUrl ? (
+                <Image
+                  src={photoUrl}
+                  width={70}
+                  height={70}
+                  alt="Google Profile"
+                  className="rounded-md object-cover"
+                />
+              ) : (
+                <div className="w-[70px] h-[70px] rounded-md flex items-center justify-center">
+                  <DefaultUserIcon />
+                </div>
+              )}
+            </>
+          )}
+          {loading && (
+            <div className="w-[70px] h-[70px] rounded-md bg-gray-200 animate-pulse"></div>
+          )}
         </div>
 
         {/* Name */}

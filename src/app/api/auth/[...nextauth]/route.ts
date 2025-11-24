@@ -85,8 +85,8 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
 
-    async redirect() {
-      return "/calendar"; // redirect after login
+    async redirect({ baseUrl }) {
+      return `${baseUrl}/calendar`; // redirect after login
     },
 
     async session({ session, token }) {
@@ -105,6 +105,19 @@ export const authOptions: NextAuthOptions = {
 
   session: {
     strategy: "jwt",
+    maxAge: 7 * 24 * 60 * 60, // 7 days
+  },
+
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+      },
+    },
   },
 
   secret: process.env.NEXTAUTH_SECRET,
