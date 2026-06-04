@@ -1,14 +1,13 @@
 // src/app/api/tasks/route.ts
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import clientPromise from '../../../lib/mongodb';
-import { getUserIdFromRequest } from '../../../lib/auth';
+import { getUserIdFromRequest } from '../../../lib/auth'; // <-- FIXED
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    
+    const userId = await getUserIdFromRequest(request); // <-- FIXED
+
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -19,7 +18,6 @@ export async function GET(request: NextRequest) {
     const client = await clientPromise;
     const db = client.db('calendarDB');
 
-    // Get tasks for the user
     const tasks = await db
       .collection('tasks')
       .find({ userId })
@@ -37,8 +35,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    
+    const userId = await getUserIdFromRequest(request); // <-- FIXED
+
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -50,8 +48,7 @@ export async function POST(request: NextRequest) {
     const db = client.db('calendarDB');
 
     const taskData = await request.json();
-    
-    // Create new task with userId from session
+
     const taskToInsert = {
       ...taskData,
       userId,
@@ -62,9 +59,9 @@ export async function POST(request: NextRequest) {
     const result = await db.collection('tasks').insertOne(taskToInsert);
 
     return NextResponse.json(
-      { 
+      {
         ...taskToInsert,
-        _id: result.insertedId 
+        _id: result.insertedId,
       },
       { status: 201 }
     );
@@ -79,8 +76,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    
+    const userId = await getUserIdFromRequest(request); // <-- FIXED
+
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -99,11 +96,10 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
-    
-    // Delete task - ensure userId matches for security
+
     const result = await db.collection('tasks').deleteOne({
       _id: new ObjectId(id),
-      userId,
+      userId, // ensure user owns this task
     });
 
     if (result.deletedCount === 0) {

@@ -12,43 +12,36 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setLoading(true);
     setMessage("");
 
-    
     try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include', // Important: include cookies in the request
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
       });
 
-      const data = await res.json();
+      if (result?.ok) {
+        setMessage("Login successful");
 
-      if (res.ok) {
-        setMessage(data.message || "Login successful");
-        console.log("Login successful, cookies set");
-        
-        // Wait a moment to ensure cookies are set, then hard redirect
-        // This ensures the middleware can read the cookies on the next request
         setTimeout(() => {
           window.location.href = "/calendar";
-        }, 1500);
+        }, 1000);
       } else {
-        setMessage(data.error || "Login failed");
-        console.error("Login failed:", data.error);
+        setMessage("Invalid email or password");
       }
     } catch (error) {
-      setMessage("An error occurred. Please try again.");
-      console.error("Login error:", error);
+      console.error(error);
+      setMessage("Something went wrong");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-4">
+    <div className="min-h-screen flex items-center text-black justify-center bg-white px-4">
       <div className="absolute top-8 left-8 flex items-center gap-2">
         <svg viewBox="0 0 24 24" version="1.1" fill="white" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8">
           <g>

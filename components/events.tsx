@@ -20,6 +20,8 @@ interface Event {
   end: string;
   color: string;
   description?: string;
+
+  source?: "event";
 }
 
 interface ServerEvent {
@@ -38,10 +40,13 @@ export default function Events() {
   const [events, setEvents] = useState<Event[]>([]);
   const [newEvent, setNewEvent] = useState({
     title: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
+    date: format(
+      new Date(Date.now() + 86400000),
+      'yyyy-MM-dd'
+    ),
     start: '',
     end: '',
-    color: 'bg-blue-100 border-l-4 border-blue-500',
+    color: 'bg-blue-300 border-l-4 border-blue-500',
     description: ''
   });
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -66,11 +71,11 @@ export default function Events() {
   }, []);
 
   const colorOptions = [
-    { id: 'blue', color: 'bg-blue-100 border-l-4 border-blue-500' },
-    { id: 'green', color: 'bg-green-100 border-l-4 border-green-500' },
-    { id: 'purple', color: 'bg-purple-100 border-l-4 border-purple-500' },
-    { id: 'yellow', color: 'bg-yellow-100 border-l-4 border-yellow-500' },
-    { id: 'pink', color: 'bg-pink-100 border-l-4 border-pink-500' },
+    { id: "blue", color: "bg-blue-500", classes: "bg-blue-300 border-l-4 border-blue-500 text-black" },
+    { id: "green", color: "bg-green-500", classes: "bg-green-300 border-l-4 border-green-500 text-black" },
+    { id: "purple", color: "bg-purple-500", classes: "bg-purple-300 border-l-4 border-purple-500 text-black" },
+    { id: "yellow", color: "bg-yellow-500", classes: "bg-yellow-300 border-l-4 border-yellow-500 text-black" },
+    { id: "pink", color: "bg-pink-500", classes: "bg-pink-300 border-l-4 border-pink-500 text-black" },
   ];
 
   const handleSubmit = async () => {
@@ -106,6 +111,7 @@ export default function Events() {
           return event;
         });
         setEvents(updatedEvents);
+        window.dispatchEvent(new Event("refreshCalendar"));
         setEditingEvent(null);
       } catch (err) {
         console.error('Error updating event:', err);
@@ -126,14 +132,15 @@ export default function Events() {
         });
 
         if (!res.ok) throw new Error('Failed to create event');
-        
+
         const saved = await res.json();
         const normalized = {
           ...saved,
           id: saved._id ? String(saved._id) : (saved.id ? String(saved.id) : tempId)
         } as Event;
-        
+
         setEvents(prev => [...prev, normalized]);
+        window.dispatchEvent(new Event("refreshCalendar"));
       } catch (err) {
         console.error('Error creating event:', err);
         // Fall back to client-side add with temp id
@@ -143,7 +150,10 @@ export default function Events() {
 
     setNewEvent({
       title: '',
-      date: format(new Date(), 'yyyy-MM-dd'),
+      date: format(
+        new Date(Date.now() + 86400000),
+        'yyyy-MM-dd'
+      ),
       start: '',
       end: '',
       color: 'bg-blue-100 border-l-4 border-blue-500',
@@ -177,7 +187,7 @@ export default function Events() {
         <motion.button
           layout
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#8054e9] text-white rounded-lg hover:bg-[#6f45d2] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -201,7 +211,7 @@ export default function Events() {
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="font-semibold text-lg">{event.title}</h3>
+                  <h3 className=" text-lg text-black">{event.title}</h3>
                   <div className="flex items-center gap-3 mt-2 text-sm text-gray-600">
                     <div className="flex items-center gap-1">
                       <CalendarIcon size={14} />
@@ -254,6 +264,10 @@ export default function Events() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: "var(--bg)",
+                color: "var(--text)",
+              }}
             >
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold">{editingEvent ? 'Edit Event' : 'New Event'}</h3>
@@ -263,7 +277,10 @@ export default function Events() {
                     setEditingEvent(null);
                     setNewEvent({
                       title: '',
-                      date: format(new Date(), 'yyyy-MM-dd'),
+                      date: format(
+                        new Date(Date.now() + 86400000),
+                        'yyyy-MM-dd'
+                      ),
                       start: '',
                       end: '',
                       color: 'bg-blue-100 border-l-4 border-blue-500',
@@ -285,7 +302,7 @@ export default function Events() {
                     type="text"
                     value={newEvent.title}
                     onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#8054e9]"
+                    className="w-full text-[18px] hover:border-2 border-2 border-[#ffffff]/20 hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
                     placeholder="Enter event title"
                   />
                 </div>
@@ -298,7 +315,7 @@ export default function Events() {
                     type="date"
                     value={newEvent.date}
                     onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#8054e9]"
+                    className="w-full text-[18px] hover:border-2 border-2 border-[#ffffff]/20 hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
                   />
                 </div>
 
@@ -311,7 +328,7 @@ export default function Events() {
                       type="time"
                       value={newEvent.start}
                       onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#8054e9]"
+                      className="w-full text-[18px] hover:border-2 border-2 border-[#ffffff]/20 hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
                     />
                   </div>
                   <div className="flex-1">
@@ -322,7 +339,7 @@ export default function Events() {
                       type="time"
                       value={newEvent.end}
                       onChange={(e) => setNewEvent({ ...newEvent, end: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#8054e9]"
+                      className="w-full text-[18px] hover:border-2 border-2 border-[#ffffff]/20 hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
                     />
                   </div>
                 </div>
@@ -331,15 +348,64 @@ export default function Events() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Color
                   </label>
-                  <div className="flex gap-2">
-                    {colorOptions.map(({ id, color }) => (
-                      <button
-                        key={id}
-                        onClick={() => setNewEvent({ ...newEvent, color })}
-                        className={`w-8 h-8 rounded-lg transition-transform ${color} ${newEvent.color === color ? 'ring-2 ring-[#8054e9] ring-offset-2 scale-110' : ''
-                          }`}
-                      />
-                    ))}
+                  <div className="flex items-center gap-3 mt-2">
+                    <h1 className="font-bold text-[14px]">Label Color</h1>
+
+                    {[
+                      {
+                        id: "blue",
+                        color: "bg-blue-500",
+                        classes: "bg-blue-300 border-l-4 border-blue-500 text-black",
+                      },
+                      {
+                        id: "green",
+                        color: "bg-green-500",
+                        classes: "bg-green-300 border-l-4 border-green-500 text-black",
+                      },
+                      {
+                        id: "purple",
+                        color: "bg-purple-500",
+                        classes: "bg-purple-300 border-l-4 border-purple-500 text-black",
+                      },
+                      {
+                        id: "yellow",
+                        color: "bg-yellow-500",
+                        classes: "bg-yellow-300 border-l-4 border-yellow-500 text-black",
+                      },
+                      {
+                        id: "pink",
+                        color: "bg-pink-500",
+                        classes: "bg-pink-300 border-l-4 border-pink-500 text-black",
+                      },
+                    ].map(({ id, color, classes }) => {
+                      const isSelected = newEvent.color === classes;
+
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() =>
+                            setNewEvent({
+                              ...newEvent,
+                              color: classes,
+                            })
+                          }
+                          className={`
+          w-6
+          h-6
+          rounded-full
+          ${color}
+          transition-transform
+          duration-300
+          hover:scale-110
+          ${isSelected
+                              ? "ring-2 ring-offset-2 ring-[#8054e9]"
+                              : ""
+                            }
+        `}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -350,7 +416,7 @@ export default function Events() {
                   <textarea
                     value={newEvent.description}
                     onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#8054e9] min-h-[100px]"
+                    className="w-full text-[18px] hover:border-2 border-2 border-[#ffffff]/20 hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1 min-h-[150px] "
                     placeholder="Add event description..."
                   />
                 </div>
@@ -367,14 +433,18 @@ export default function Events() {
                           });
 
                           if (!res.ok) throw new Error('Failed to delete event');
-                          
+
                           // Remove from local state after successful server delete
                           setEvents(prev => prev.filter(e => e.id !== editingEvent.id));
+                          window.dispatchEvent(new Event("refreshCalendar"));
                           setEditingEvent(null);
                           setIsModalOpen(false);
                           setNewEvent({
                             title: '',
-                            date: format(new Date(), 'yyyy-MM-dd'),
+                            date: format(
+                              new Date(Date.now() + 86400000),
+                              'yyyy-MM-dd'
+                            ),
                             start: '',
                             end: '',
                             color: 'bg-blue-100 border-l-4 border-blue-500',
@@ -391,7 +461,7 @@ export default function Events() {
                   )}
                   <button
                     onClick={handleSubmit}
-                    className="text-[18px] flex-1 py-2 bg-[#8054e9] text-white rounded-[12px] duration-200 hover:bg-[#6f45d2]"
+                    className="text-[18px] flex-1 py-2 bg-[#8054e9] text-white rounded-[12px] duration-200 hover:bg-[var(--accent-hover)]"
                   >
                     {editingEvent ? 'Update Event' : 'Create Event'}
                   </button>

@@ -46,7 +46,7 @@ export default function Subscription() {
         <h2 className="text-lg font-semibold">Subscription</h2>
         <motion.button
           whileTap={{ scale: 0.97 }}
-          className="text-sm bg-[#8054e9] text-white px-4 py-2 rounded-lg shadow-sm hover:bg-[#6e46cb] transition"
+          className="text-sm bg-[var(--accent)] text-white px-4 py-2 rounded-lg shadow-sm hover:bg-[var(--accent-hover)] transition"
         >
           Manage billing
         </motion.button>
@@ -116,8 +116,8 @@ export default function Subscription() {
                 onClick={() => setCurrentPlan(plan.name)}
                 className={`w-full py-2 text-sm rounded-lg font-medium transition ${
                   currentPlan === plan.name
-                    ? "bg-[#8054e9]/10 text-[#8054e9] border border-[#8054e9]"
-                    : "bg-[#8054e9] text-white hover:bg-[#6e46cb]"
+                    ? "bg-[var(--accent)]/10 text-[#8054e9] border border-[#8054e9]"
+                    : "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
                 }`}
               >
                 {currentPlan === plan.name ? "Current Plan" : "Upgrade"}

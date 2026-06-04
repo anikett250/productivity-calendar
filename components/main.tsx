@@ -25,8 +25,18 @@ export default function Main() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f8f8f8]">
-      <div className="w-64 border-r border-gray-100">
+    <div className="flex min-h-screen bg-[#f8f8f8]"
+    style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
+      <div className="w-64"
+      style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
         <Toolbar onNavigate={setActiveComponent} />
       </div>
       <div className="flex-1">

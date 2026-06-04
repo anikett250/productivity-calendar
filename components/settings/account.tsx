@@ -35,8 +35,10 @@ export default function SettingsAccount() {
           const data = await response.json();
           setUserSession(data);
         }
+        // If not ok (401, 500), userSession remains null which is fine
       } catch (error) {
         console.error("Error fetching user session:", error);
+        // Error is expected if no manual login session exists
       } finally {
         setLoading(false);
       }
@@ -58,7 +60,12 @@ export default function SettingsAccount() {
   };
 
   return (
-    <div className="w-full bg-[#f8f8f8] text-[#303030] rounded-2xl p-6 md:p-8 max-w-[80vh] ">
+    <div className="w-full bg-[#f8f8f8] text-[#303030] rounded-2xl p-6 md:p-8 max-w-[80vh] "
+    style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
       {/* Header */}
       <motion.div
         layout
@@ -81,7 +88,7 @@ export default function SettingsAccount() {
             <p className="text-[15px] font-semibold mt-1">{user.plan}</p>
           </div>
 
-          <button className="bg-[#8054e9] hover:bg-[#6f45d2] px-4 py-2 rounded-lg text-sm text-white transition">
+          <button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] px-4 py-2 rounded-lg text-sm text-white transition">
             Manage plan
           </button>
         </div>
@@ -126,7 +133,7 @@ export default function SettingsAccount() {
         </div>
 
         {/* Manage Account */}
-        <button className="flex items-center gap-2 bg-[#8054e9] hover:bg-[#6f45d2] px-4 py-2 rounded-lg text-sm text-white transition mb-2">
+        <button className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] px-4 py-2 rounded-lg text-sm text-white transition mb-2">
           Manage account
           <ExternalLink size={14} />
         </button>

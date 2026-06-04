@@ -26,7 +26,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
       { id: "account", label: "Account", icon: <CircleUserRound size={18} /> },
       { id: "general", label: "General", icon: <UserRoundCog size={18} /> },
     { id: "theme", label: "Theme", icon: <Palette size={18} /> },
-    { id: "subscription", label: "Subscription", icon: <Wallet size={18} /> },
+    // { id: "subscription", label: "Subscription", icon: <Wallet size={18} /> },
   ];
 
   return (

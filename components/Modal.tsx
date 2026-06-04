@@ -21,7 +21,6 @@ export default function Modal({ isOpen, onClose, children }: ModalProps) {
         >
           <motion.div
             className="
-              bg-white 
               rounded-2xl 
               shadow-2xl 
               overflow-hidden 
@@ -31,6 +30,10 @@ export default function Modal({ isOpen, onClose, children }: ModalProps) {
               flex 
               flex-col
             "
+            style={{
+              backgroundColor: "var(--bg)",
+              color: "var(--text)",
+            }}
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}

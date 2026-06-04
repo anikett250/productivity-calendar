@@ -13,7 +13,12 @@ export default function General() {
     const [commandMenu, setCommandMenu] = useState(false);
 
     return (
-        <div className="w-full h-full bg-[#f8f8f8] text-black p-8 overflow-y-auto relative">
+        <div className="w-full h-full bg-[#f8f8f8] text-black p-8 overflow-y-auto relative"
+        style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
             {/* General Section */}
             <section className="mb-10">
                 <h2 className="text-lg font-semibold mb-6">General</h2>
@@ -23,7 +28,12 @@ export default function General() {
                     <label className="block text-sm font-medium text-[#303030] mb-2">
                         Language
                     </label>
-                    <select className="w-full bg-[#f8f8f8] transition-all hover:border-[#8054e9] border border-[#f8f8f8] rounded-[13px] px-3 py-2 text-sm focus:outline-none">
+                    <select className="w-full bg-[#f8f8f8] transition-all hover:border-[#8054e9] border border-[#f8f8f8] rounded-[13px] px-3 py-2 text-sm focus:outline-none"
+                    style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
                         <option>English</option>
                         <option>Hindi</option>
                         <option>French</option>
@@ -37,7 +47,12 @@ export default function General() {
                         Home view
                     </label>
                     <div className="relative pl-10">
-                        <select className="w-full appearance-none bg-[#f8f8f8] transition-all hover:border-[#8054e9] border border-[#f8f8f8] rounded-[13px] px-3 py-2 text-sm focus:outline-none">
+                        <select className="w-full appearance-none bg-[#f8f8f8] transition-all hover:border-[#8054e9] border border-[#f8f8f8] rounded-[13px] px-3 py-2 text-sm focus:outline-none"
+                        style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
                             <option>Today</option>
                             <option>Upcoming</option>
                             <option>Week</option>
@@ -60,7 +75,12 @@ export default function General() {
                     <label className="block text-sm font-medium text-[#303030] mb-2">
                         Time zone
                     </label>
-                    <select className="w-full bg-[#f8f8f8] transition-all hover:border-[#8054e9] border border-[#f8f8f8] rounded-[13px] px-3 py-2 text-sm focus:outline-none">
+                    <select className="w-full bg-[#f8f8f8] transition-all hover:border-[#8054e9] border border-[#f8f8f8] rounded-[13px] px-3 py-2 text-sm focus:outline-none"
+                    style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
                         <option>Asia/Kolkata</option>
                         <option>America/New_York</option>
                         <option>Europe/London</option>
@@ -73,7 +93,12 @@ export default function General() {
                     <label className="block text-sm font-medium text-[#303030] mb-2">
                         Time format
                     </label>
-                    <select className="w-full bg-[#f8f8f8] transition-all hover:border-[#8054e9] border border-[#f8f8f8] rounded-[13px] px-3 py-2 text-sm focus:outline-none">
+                    <select className="w-full bg-[#f8f8f8] transition-all hover:border-[#8054e9] border border-[#f8f8f8] rounded-[13px] px-3 py-2 text-sm focus:outline-none"
+                    style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
                         <option>1:00pm</option>
                         <option>13:00</option>
                     </select>
@@ -84,7 +109,12 @@ export default function General() {
                     <label className="block text-sm font-medium text-[#303030] mb-2">
                         Date format
                     </label>
-                    <select className="w-full bg-[#f8f8f8] transition-all hover:border-[#8054e9] border border-[#f8f8f8] rounded-[13px] px-3 py-2 text-sm focus:outline-none">
+                    <select className="w-full bg-[#f8f8f8] transition-all hover:border-[#8054e9] border border-[#f8f8f8] rounded-[13px] px-3 py-2 text-sm focus:outline-none"
+                    style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
                         <option>DD-MM-YYYY</option>
                         <option>MM-DD-YYYY</option>
                         <option>YYYY-MM-DD</option>
@@ -112,8 +142,18 @@ export default function General() {
                                 exit={{ opacity: 0, y: -20 }}
                                 transition={{ duration: 0.3, ease: "easeOut" }}
                                 className="mt-4 rounded-xl bg-[#efefef] border border-gray-200 p-4"
+                                style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+
                             >
-                                <p className="text-sm text-[#303030]">
+                                <p className="text-sm text-[#303030]"
+                                style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
                                     ✨ You are using early access features that may change or
                                     break unexpectedly.
                                 </p>
@@ -155,12 +195,17 @@ function ToggleRow({
     setIsOn: (v: boolean) => void;
 }) {
     return (
-        <div className="flex items-center justify-between text-sm text-[#303030]">
+        <div className="flex items-center justify-between text-sm text-[#303030]"
+        style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
             <span>{label}</span>
 
             <motion.button
                 onClick={() => setIsOn(!isOn)}
-                className={`relative w-11 h-6 rounded-full flex items-center ${isOn ? "bg-[#8054e9]" : "bg-gray-300"
+                className={`relative w-11 h-6 rounded-full flex items-center ${isOn ? "bg-[var(--accent)]" : "bg-gray-300"
                     }`}
                 transition={{ duration: 0.25, ease: "easeInOut" }}
             >

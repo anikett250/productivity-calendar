@@ -63,8 +63,6 @@ export async function POST(req: NextRequest) {
         color: "bg-blue-100 border-l-4 border-blue-500",
         createdAt: new Date(),
       };
-
-      await db.collection("tasks").insertOne(calendarEvent);
     }
 
     return NextResponse.json({ ...newTodo, _id: result.insertedId }, { status: 201 });

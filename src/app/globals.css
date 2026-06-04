@@ -1,1 +1,34 @@
 @import "tailwindcss";
+
+:root {
+  --bg: #F5F5F7;
+  --text: #000000;
+
+  --card: #f8f8f8;
+  --card-hover: #eeeeee;
+  --border: #e5e5e5;
+
+  --accent: #8054e9;
+  --accent-hover: #6c44d1;
+}
+
+.dark {
+  --bg: #121212;
+  --text: #ffffff;
+
+  --card: #1e1e1e;
+  --card-hover: #2a2a2a;
+  --border: #2a2a2a;
+
+  --accent: #8054e9;
+  --accent-hover: #6c44d1;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}

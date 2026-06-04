@@ -39,23 +39,84 @@ export default function TimerComponent() {
     const [setupComplete, setSetupComplete] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState(false);
 
-    // Fetch todos
-    useEffect(() => {
-        const fetchTodos = async () => {
-            try {
-                const res = await fetch("/api/todos");
-                if (!res.ok) throw new Error("Failed to fetch todos");
-                const data = await res.json();
-                setTodos(data.map((t: { _id?: string, id?: string } & Omit<Todo, 'id'>) => ({
-                    ...t,
-                    id: t._id ? String(t._id) : String(t.id)
-                })));
-            } catch (err) {
-                console.error(err);
-            }
+    const parseApiResponse = async (res: Response) => {
+        if (!res.ok) return [];
+        const data = await res.json();
+
+        if (Array.isArray(data)) return data;
+        if (Array.isArray((data as any).tasks)) return (data as any).tasks;
+        return [];
+    };
+
+    const getDurationFromTimes = (start?: string, end?: string): number | null => {
+        if (!start || !end) return null;
+
+        const parse = (time: string) => {
+            const [hours, minutes] = time.split(":").map((part) => parseInt(part, 10));
+            if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+            return hours * 60 + minutes;
         };
-        fetchTodos();
+
+        const startMinutes = parse(start);
+        const endMinutes = parse(end);
+        if (startMinutes === null || endMinutes === null) return null;
+
+        let diff = endMinutes - startMinutes;
+        if (diff <= 0) diff += 24 * 60;
+        return diff;
+    };
+
+    const getTaskTimeValue = (task: any): string | number => {
+        if (task.time !== undefined && task.time !== null && task.time !== "") {
+            return task.time;
+        }
+
+        const duration = getDurationFromTimes(task.start, task.end);
+        return duration !== null ? duration : "0";
+    };
+
+    const fetchTodos = useCallback(async () => {
+        try {
+            const [todosRes, tasksRes] = await Promise.all([
+                fetch("/api/todos"),
+                fetch("/api/tasks")
+            ]);
+
+            const [todosData, tasksData] = await Promise.all([
+                parseApiResponse(todosRes),
+                parseApiResponse(tasksRes)
+            ]);
+
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const combined = [...todosData, ...tasksData].filter((t: any) => {
+                if (!t.date) return false;
+                const parsed = new Date(t.date);
+                return format(parsed, 'yyyy-MM-dd') === today;
+            });
+
+            setTodos(combined.map((t: any) => ({
+                id: t._id ? String(t._id) : String(t.id),
+                text: t.text || t.title || "Untitled task",
+                completed: Boolean(t.completed),
+                comments: typeof t.comments === 'number' ? t.comments : 0,
+                time: getTaskTimeValue(t),
+                date: t.date ?? "",
+                label: t.label ?? "",
+            })));
+        } catch (err) {
+            console.error(err);
+        }
     }, []);
+
+    // Fetch tasks and todos from the DB
+    useEffect(() => {
+        fetchTodos();
+
+        const refreshHandler = () => fetchTodos();
+        window.addEventListener('refreshCalendar', refreshHandler);
+
+        return () => window.removeEventListener('refreshCalendar', refreshHandler);
+    }, [fetchTodos]);
 
     // Calculate break schedule when configuration changes
     useEffect(() => {
@@ -113,7 +174,7 @@ export default function TimerComponent() {
     const convertTimeToMinutes = (time: string | number): number => {
         if (typeof time === 'number') return time;
         const timeStr = time.toLowerCase();
-        
+
         // Handle combined format (e.g., "1h 20min", "1h 20m", "1hour 20minutes")
         if (timeStr.includes('h') && (timeStr.includes('min') || timeStr.includes('m'))) {
             const parts = timeStr
@@ -123,9 +184,9 @@ export default function TimerComponent() {
                 .replace('hours', 'h')
                 .replace('hour', 'h')
                 .split(/\s+/);
-            
+
             let totalMinutes = 0;
-            
+
             parts.forEach(part => {
                 if (part.includes('h')) {
                     const hours = parseFloat(part.replace('h', ''));
@@ -135,30 +196,77 @@ export default function TimerComponent() {
                     totalMinutes += minutes;
                 }
             });
-            
+
             return Math.round(totalMinutes);
         }
-        
+
         // Handle hours only (e.g., "2h", "2.5h")
         if (timeStr.includes('h')) {
             const hours = parseFloat(timeStr.replace('h', ''));
             return Math.round(hours * 60);
         }
-        
+
         // Handle time format (e.g., "2:30")
         if (timeStr.includes(':')) {
             const [hours, minutes] = timeStr.split(':').map(Number);
             return (hours * 60) + minutes;
         }
-        
+
         // Handle plain minutes
         return parseInt(timeStr);
     };
 
+    const formatDurationLabel = (time: string | number): string => {
+        let totalMinutes = 0;
+
+        if (typeof time === 'number') {
+            totalMinutes = time;
+        } else {
+            const trimmed = time.trim();
+            if (/^\d+$/.test(trimmed)) {
+                totalMinutes = parseInt(trimmed, 10);
+            } else if (trimmed.includes(':')) {
+                const [hours, minutes] = trimmed.split(':').map(Number);
+                if (!Number.isNaN(hours) && !Number.isNaN(minutes)) {
+                    totalMinutes = hours * 60 + minutes;
+                } else {
+                    return trimmed;
+                }
+            } else {
+                const normalized = trimmed
+                    .replace(/hours?/i, 'h')
+                    .replace(/minutes?/i, 'm')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                const parsed = convertTimeToMinutes(normalized);
+                if (!Number.isNaN(parsed)) {
+                    totalMinutes = parsed;
+                } else {
+                    return normalized;
+                }
+            }
+        }
+
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+
+        const hourLabel = hours === 1 ? 'hour' : 'hours';
+        const minuteLabel = minutes === 1 ? 'minute' : 'minutes';
+
+        if (hours > 0 && minutes > 0) {
+            return `${hours} ${hourLabel} ${minutes} ${minuteLabel}`;
+        }
+        if (hours > 0) {
+            return `${hours} ${hourLabel}`;
+        }
+        return `${minutes} ${minuteLabel}`;
+    };
+
     const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
+        const hours = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
         const secs = seconds % 60;
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
     const handleTaskCompletion = useCallback(async () => {
@@ -180,6 +288,27 @@ export default function TimerComponent() {
             }
         }
     }, [selectedTask]);
+
+    useEffect(() => {
+        if (!setupComplete) {
+            setTimeLeft(totalMinutes * 60);
+        }
+    }, [totalMinutes, setupComplete]);
+
+    useEffect(() => {
+        if (!selectedTask) return;
+
+        const updatedTask = todos.find((task) => task.id === selectedTask.id);
+        if (!updatedTask) return;
+
+        if (
+            updatedTask.text !== selectedTask.text ||
+            String(updatedTask.time) !== String(selectedTask.time) ||
+            updatedTask.completed !== selectedTask.completed
+        ) {
+            setSelectedTask(updatedTask);
+        }
+    }, [todos, selectedTask]);
 
     // Modified to check if timer is complete
     useEffect(() => {
@@ -208,11 +337,11 @@ export default function TimerComponent() {
 
     const getProgressColor = () => {
         if (currentPhase === 'break') return 'bg-green-500';
-        return 'bg-[#8054e9]';
+        return 'bg-[var(--accent)]';
     };
 
     return (
-        <div className={`${englebertFont.className} p-8 flex-row `}>
+        <div className={`${englebertFont.className} p-8 flex-row`}>
             {/* Header */}
             <div className="flex justify-between items-center mb-8">
                 <div>
@@ -235,7 +364,12 @@ export default function TimerComponent() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm justify-center items-center flex ">
+            <div className="bg-white rounded-2xl shadow-sm justify-center items-center flex "
+                style={{
+                    backgroundColor: "var(--bg)",
+                    color: "var(--text)",
+                }}
+            >
 
                 {!setupComplete ? (
                     <div className="space-y-6 w-96 ">
@@ -244,7 +378,7 @@ export default function TimerComponent() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                         >
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-[#757575] mb-2">
                                 Select Task
                             </label>
                             <div className="relative">
@@ -253,23 +387,35 @@ export default function TimerComponent() {
                                     onChange={(e) => {
                                         const task = todos.find(t => t.id === e.target.value);
                                         setSelectedTask(task || null);
+
                                         if (task?.time) {
                                             const timeInMinutes = convertTimeToMinutes(task.time);
-                                            if (!isNaN(timeInMinutes)) {
+                                            if (!isNaN(timeInMinutes) && timeInMinutes > 0) {
                                                 setTotalMinutes(timeInMinutes);
+                                                setTimeLeft(timeInMinutes * 60);
                                             }
+                                        } else {
+                                            setTimeLeft(totalMinutes * 60);
                                         }
                                     }}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-[13px] focus:outline-none transition-all hover:border-[#8054e9] focus:border-[#8054e9] appearance-none"
+                                    className="w-full text-[14px] hover:border-2 border-2 border-[#ffffff]/20 hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
+                                    style={{
+                                        backgroundColor: "var(--bg)",
+                                        color: "var(--text)",
+                                    }}
                                 >
-                                    <option value="">Select a task...</option>
+                                    <option value=""
+                                        style={{
+                                            backgroundColor: "var(--bg)",
+                                            color: "var(--text)",
+                                        }}
+                                    >Select a task...</option>
                                     {todos.filter(todo => !todo.completed).map(todo => (
                                         <option key={todo.id} value={todo.id}>
-                                            {todo.text} {todo.time ? `(${todo.time})` : ''}
+                                            {todo.text} {todo.time ? `(${formatDurationLabel(todo.time)})` : ''}
                                         </option>
                                     ))}
                                 </select>
-                                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
                             </div>
                         </motion.div>
 
@@ -278,17 +424,23 @@ export default function TimerComponent() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                         >
-                            <label className="block text-sm font-medium text-gray-700 mb-2 ">
-                                Total Time (minutes)
+                            <label className="block text-sm font-medium text-[#757575] mb-2 ">
+                                Total Time
                             </label>
                             <input
                                 type="number"
                                 min="1"
                                 value={totalMinutes}
                                 onChange={(e) => setTotalMinutes(Math.max(1, parseInt(e.target.value) || 1))}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-[13px] focus:outline-none transition-all hover:border-[#8054e9] focus:border-[#8054e9]"
+                                className="w-full text-[14px] hover:border-2 border-2 border-[#ffffff]/20 hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
+                                style={{
+                                    color: "var(--text)",
+                                }}
                                 disabled={selectedTask !== null}
                             />
+                            <p className="text-sm text-[#757575] mt-2">
+                                {formatDurationLabel(totalMinutes)}
+                            </p>
                         </motion.div>
 
                         <motion.div
@@ -296,7 +448,7 @@ export default function TimerComponent() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                         >
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-[#757575] mb-2">
                                 Number of Breaks
                             </label>
 
@@ -308,16 +460,19 @@ export default function TimerComponent() {
                                 {/* Dropdown button */}
                                 <motion.button
                                     onClick={() => setDropdownOpen((prev) => !prev)}
-                                    className="w-full flex justify-between items-center px-3 py-2 border border-gray-200 rounded-[13px] focus:outline-none transition-all hover:border-[#8054e9] focus:border-[#8054e9] bg-white"
+                                    className="w-full text-[14px] text-start hover:border-2 border-2 border-[#ffffff]/20 hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
+                                    style={{
+                                        backgroundColor: "var(--bg)",
+                                        color: "var(--text)",
+                                    }}
                                     whileTap={{ scale: 0.97 }}
                                 >
                                     <span>{numBreaks} {numBreaks === 1 ? "break" : "breaks"}</span>
-                                    <motion.div
-                                        animate={{ rotate: dropdownOpen ? 180 : 0 }}
-                                        transition={{ duration: 0.2 }}
-                                    >
-                                        ▼
-                                    </motion.div>
+                                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" size={20}
+                                        style={{
+                                            color: "var(--text)",
+                                        }}
+                                    />
                                 </motion.button>
 
                                 {/* Dropdown list with animation */}
@@ -328,7 +483,11 @@ export default function TimerComponent() {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -5 }}
                                             transition={{ duration: 0.15 }}
-                                            className="absolute z-10 mt-2 w-full bg-white border border-gray-200 rounded-[13px] shadow-md overflow-hidden"
+                                            className="absolute z-10 mt-2 w-full border border-gray-300 rounded-[13px] shadow-md overflow-hidden"
+                                            style={{
+                                                backgroundColor: "var(--bg)",
+                                                color: "var(--text)",
+                                            }}
                                         >
                                             {Array.from({ length: 11 }, (_, i) => (
                                                 <motion.div
@@ -338,8 +497,11 @@ export default function TimerComponent() {
                                                         setNumBreaks(i);
                                                         setDropdownOpen(false);
                                                     }}
-                                                    className={`px-3 py-2 text-sm cursor-pointer ${i === numBreaks ? "bg-[#8054e9]/10 text-[#8054e9]" : "text-gray-700"
+                                                    className={`px-3 py-2 text-sm cursor-pointer ${i === numBreaks ? "bg-[var(--accent)]/10" : ""
                                                         }`}
+                                                    style={{
+                                                        color: "var(--text)",
+                                                    }}
                                                 >
                                                     {i} {i === 1 ? "break" : "breaks"}
                                                 </motion.div>
@@ -356,7 +518,7 @@ export default function TimerComponent() {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                             >
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-[#757575] mb-2">
                                     Break Duration (minutes)
                                 </label>
                                 <input
@@ -364,7 +526,10 @@ export default function TimerComponent() {
                                     min="1"
                                     value={breakDuration}
                                     onChange={(e) => setBreakDuration(Math.max(1, parseInt(e.target.value) || 1))}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-[13px] focus:outline-none transition-all hover:border-[#8054e9] focus:border-[#8054e9]"
+                                    className="w-full text-[14px] hover:border-2 border-2 border-[#ffffff]/20 hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
+                                    style={{
+                                        color: "var(--text)",
+                                    }}
                                 />
                             </motion.div>
                         )}
@@ -374,7 +539,7 @@ export default function TimerComponent() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             onClick={handleStart}
-                            className="w-full py-3 bg-[#8054e9] text-white rounded-[13px] hover:bg-[#6f45d2] transition-colors"
+                            className="w-full py-3 bg-[var(--accent)] text-white rounded-[13px] hover:bg-[var(--accent-hover)] transition-colors"
                         >
                             Start Timer
                         </motion.button>
@@ -385,10 +550,10 @@ export default function TimerComponent() {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 className="mt-4">
-                                <h3 className="text-sm font-medium text-gray-700 mb-2">Break Schedule:</h3>
+                                <h3 className="text-sm font-medium text-[#757575] mb-2">Break Schedule:</h3>
                                 <div className="space-y-2">
                                     {breaks.map((b, i) => (
-                                        <div key={i} className="text-sm text-gray-600">
+                                        <div key={i} className="text-sm text-[#757575]">
                                             Break {i + 1}: at {b.startTime} minutes ({b.duration} min)
                                         </div>
                                     ))}
@@ -405,7 +570,7 @@ export default function TimerComponent() {
                         <div className="relative pt-1">
                             <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-100">
                                 <motion.div
-                                    className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getProgressColor()}`}
+                                    className={`shadow-none flex flex-col text-center whitespace-nowrap text-[#757575] justify-center ${getProgressColor()}`}
                                     initial={{ width: "100%" }}
                                     animate={{ width: `${(timeLeft / (totalMinutes * 60)) * 100}%` }}
                                     transition={{ duration: 0.3 }}
@@ -423,7 +588,7 @@ export default function TimerComponent() {
                         <div className="flex justify-center space-x-4">
                             <motion.button
                                 onClick={handlePause}
-                                className="p-3 w-12 h-12 rounded-full bg-[#8054e9] text-white hover:bg-[#6f45d2] transition-colors relative flex items-center justify-center"
+                                className="p-3 w-12 h-12 rounded-full bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors relative flex items-center justify-center"
                                 whileTap={{ scale: 0.9 }}
                             >
                                 <AnimatePresence mode="wait" initial={false}>

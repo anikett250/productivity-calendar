@@ -5,15 +5,32 @@ import { format, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, st
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Nunito } from "next/font/google";
+import {
+  DndContext,
+  useDraggable,
+  useDroppable,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 
 interface CalendarEvent {
   id?: string;
   _id?: string;
-  title: string;
+
+  title?: string;
+  text?: string;
+
   start: string;
   end: string;
-  color: string;
+
+  color?: string;
+  label?: string;
+
   date: string;
+
+  source?: "task" | "todo";
 }
 
 const englebertFont = Nunito({
@@ -29,6 +46,7 @@ export default function Calendar() {
   const [dragStart, setDragStart] = useState<{ dayIndex: number; timeIndex: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<{ dayIndex: number; timeIndex: number } | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null); // for modal
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   // No need to fetch from API anymore, just use local state
 
@@ -100,7 +118,7 @@ export default function Calendar() {
         title: "New Task",
         start: timeSlots[start],
         end: timeSlots[end] || "17:00",
-        color: "bg-blue-100 border-l-4 border-blue-500",
+        color: "bg-blue-300 border-l-4 border-blue-500 text-black",
         date: format(day, "yyyy-MM-dd"),
       };
 
@@ -117,8 +135,11 @@ export default function Calendar() {
 
         if (res.ok) {
           console.log("Saved to DB:", result);
-          // Add the returned task (with _id and userId) to state
+
           setEvents((prev) => [...prev, result]);
+
+          // Open edit modal immediately
+          setSelectedEvent(result);
         } else {
           console.error("Error creating task:", result.error || result.message);
         }
@@ -132,35 +153,185 @@ export default function Calendar() {
   };
 
   useEffect(() => {
-    const fetchTasks = async () => {
+    const fetchAllData = async () => {
       try {
-        const res = await fetch("/api/tasks");
-        if (!res.ok) {
-          console.error("Failed to fetch tasks");
-          return;
-        }
-        const data = await res.json();
-        // Handle both array and { tasks } object responses
-        const tasksArray = Array.isArray(data) ? data : (data?.tasks || []);
-        setEvents(tasksArray); // populate UI with tasks from DB
+        // fetch calendar tasks
+        const tasksRes = await fetch("/api/tasks");
+        const tasksData = await tasksRes.json();
+
+        const tasks = (Array.isArray(tasksData)
+          ? tasksData
+          : tasksData.tasks || []
+        ).map((task: any) => ({
+          ...task,
+          source: "task",
+        }));
+
+        // fetch events
+        const eventsRes = await fetch("/api/events");
+        const eventsData = await eventsRes.json();
+
+        const calendarEvents = eventsData.map((event: any) => ({
+          ...event,
+          source: "event",
+        }));
+
+        // fetch todos
+        const todosRes = await fetch("/api/todos");
+        const todosData = await todosRes.json();
+
+        const todos = todosData
+          .filter((todo: any) => todo.start && todo.end)
+          .map((todo: any) => ({
+            ...todo,
+            source: "todo",
+            color:
+              todo.color ||
+              "bg-blue-300 border-l-4 border-blue-500 text-black",
+          }));
+
+        setEvents([
+          ...tasks,
+          ...todos,
+          ...calendarEvents,
+        ]);
+
+        setTimeout(() => {
+          setInitialLoadDone(true);
+        }, 100);
+
       } catch (err) {
-        console.error("Error fetching tasks:", err);
+        console.error(err);
       }
     };
 
-    fetchTasks();
+    fetchAllData();
+
+    const handleRefresh = () => {
+      fetchAllData();
+    };
+
+    window.addEventListener(
+      "refreshCalendar",
+      handleRefresh
+    );
+
+    return () => {
+      window.removeEventListener(
+        "refreshCalendar",
+        handleRefresh
+      );
+    };
   }, []);
 
   // --- Edit Modal ---
   const handleEventClick = (event: CalendarEvent) => setSelectedEvent(event);
   const handleModalChange = (field: string, value: string) => {
-    setSelectedEvent((prev: CalendarEvent | null) => prev ? { ...prev, [field]: value } : null);
+    setSelectedEvent((prev: CalendarEvent | null) => {
+      if (!prev) return null;
+
+      const updated = { ...prev, [field]: value };
+
+      // keep title/text synced
+      if (field === "title") {
+        updated.text = value;
+      }
+
+      if (field === "text") {
+        updated.title = value;
+      }
+
+      return updated;
+    });
   };
 
-  const handleSave = () => {
-    if (selectedEvent) {
-      setEvents(prev => prev.map(e => (e._id || e.id) === (selectedEvent._id || selectedEvent.id) ? selectedEvent : e));
+
+  const handleSave = async () => {
+    if (!selectedEvent) return;
+
+    try {
+      const itemId = selectedEvent._id || selectedEvent.id;
+
+      // TODO ITEM
+      if (selectedEvent.source === "todo") {
+        const res = await fetch("/api/todos", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: itemId,
+
+            text:
+              selectedEvent.title ||
+              selectedEvent.text,
+
+            title:
+              selectedEvent.title ||
+              selectedEvent.text,
+
+            start: selectedEvent.start,
+            end: selectedEvent.end,
+
+            color: selectedEvent.color,
+          }),
+        });
+
+        const updatedTodo = await res.json();
+
+        if (!res.ok) {
+          console.error("Failed to update todo");
+          return;
+        }
+
+        setEvents((prev) =>
+          prev.map((event) =>
+            (event._id || event.id) === itemId
+              ? {
+                ...event,
+                ...updatedTodo,
+              }
+              : event
+          )
+        );
+
+        setSelectedEvent(null);
+
+        window.dispatchEvent(
+          new Event("refreshCalendar")
+        );
+
+        return;
+      }
+
+      // NORMAL TASK
+      const res = await fetch(`/api/tasks/${itemId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(selectedEvent),
+      });
+
+      const updatedTask = await res.json();
+
+      if (!res.ok) {
+        console.error("Failed to update task");
+        return;
+      }
+
+      setEvents((prev) =>
+        prev.map((event) =>
+          (event._id || event.id) === itemId
+            ? updatedTask
+            : event
+        )
+      );
+
       setSelectedEvent(null);
+
+    } catch (error) {
+      console.error("Update error:", error);
     }
   };
 
@@ -168,463 +339,773 @@ export default function Calendar() {
     if (!selectedEvent) return;
 
     try {
-      // Delete from DB - use _id if available (from DB), otherwise use id
-      const taskId = selectedEvent._id || selectedEvent.id;
-      const res = await fetch("/api/tasks", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: taskId }),
-      });
+      const itemId =
+        selectedEvent._id || selectedEvent.id;
 
-      if (!res.ok) {
-        console.error("Failed to delete task from DB");
+      // TODO DELETE
+      if (selectedEvent.source === "todo") {
+        await fetch("/api/todos", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: itemId,
+          }),
+        });
       }
+
+      // TASK DELETE
+      else {
+        await fetch("/api/tasks", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: itemId,
+          }),
+        });
+      }
+
+      setEvents((prev) =>
+        prev.filter(
+          (e) =>
+            (e._id || e.id) !== itemId
+        )
+      );
+
+      setSelectedEvent(null);
+
+      window.dispatchEvent(
+        new Event("refreshCalendar")
+      );
+
     } catch (err) {
-      console.error("Error deleting task:", err);
+      console.error("Delete error:", err);
     }
-
-    // Remove from local state immediately
-    setEvents(prev => prev.filter(e => (e._id || e.id) !== (selectedEvent._id || selectedEvent.id)));
-    setSelectedEvent(null);
-
-    // Also refresh the calendar (optional if you want it synced elsewhere)
-    window.dispatchEvent(new Event("refreshCalendar"));
   };
 
+  const handleTaskDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over) return;
+
+    const taskId = active.id as string;
+
+    const [date, time] = String(over.id).split("|");
+
+    const task = events.find(
+      (e) => (e._id || e.id) === taskId
+    );
+
+    if (!task) return;
+    if (task.source === "todo") return;
+
+    const startHour = parseInt(time.split(":")[0], 10);
+
+    const endHour =
+      startHour +
+      (
+        parseInt(task.end.split(":")[0]) -
+        parseInt(task.start.split(":")[0])
+      );
+
+    const updatedTask = {
+      ...task,
+      date,
+      start: `${startHour.toString().padStart(2, "0")}:00`,
+      end: `${endHour.toString().padStart(2, "0")}:00`,
+    };
+
+    // Optimistic UI
+    setEvents((prev) =>
+      prev.map((e) =>
+        (e._id || e.id) === taskId
+          ? updatedTask
+          : e
+      )
+    );
+
+    try {
+      await fetch(`/api/tasks/${taskId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedTask),
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    })
+  );
+
   return (
-    <div
-      className={`${englebertFont.className} flex-1 bg-white rounded-2xl shadow-sm p-8 h-screen overflow-hidden flex flex-col select-none text-3xl font-bold`}
-      onMouseUp={handleMouseUp}
+    <DndContext
+      sensors={sensors}
+      onDragEnd={handleTaskDragEnd}
     >
-      {/* Header */}
-      <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
-        <div className="flex items-center gap-4">
-          <motion.h2
-            layout
-            className="text-2xl font-bold"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            {format(currentDate, "dd MMMM yyyy")}
-          </motion.h2>
-          <span className="text-sm text-gray-500">GMT +7</span>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <motion.div
-            layout
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-1 relative p-[3px] bg-[#8054e9] rounded-[13px]">
-            {viewOptions.map((option) => (
-              <div key={option} className="relative">
-                {view === option && (
-                  <motion.div
-                    layoutId="viewBackground"
-                    className="absolute inset-0 bg-white rounded-[11px]"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  />
-                )}
-                <button
-                  onClick={() => setView(option)}
-                  className={`px-4 py-2 text-sm font-medium rounded-lg relative z-10 ${view === option ? "text-[#8054e9]" : "text-white"
-                    }`}
-                >
-                  {option}
-                </button>
-              </div>
-            ))}
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center rounded-[10px] gap-2">
-            <button
-              onClick={() => {
-                switch (view) {
-                  case "Day":
-                    setCurrentDate(subDays(currentDate, 1));
-                    break;
-                  case "Week":
-                    setCurrentDate(subDays(currentDate, 7));
-                    break;
-                  case "Month":
-                    setCurrentDate(subMonths(currentDate, 1));
-                    break;
-                  case "Year":
-                    setCurrentDate(subYears(currentDate, 1));
-                    break;
-                }
-              }}
-              className="p-1 hover:bg-gray-100 rounded-[10px]"
+      <div
+        className={`${englebertFont.className} flex-1 rounded-2xl shadow-sm p-8 h-screen overflow-hidden flex flex-col select-none text-3xl font-bold`}
+        style={{
+          backgroundColor: "var(--bg)",
+          color: "var(--text)",
+        }}
+        onMouseUp={handleMouseUp}
+      >
+        {/* Header */}
+        <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
+          <div className="flex items-center gap-4">
+            <motion.h2
+              layout
+              className="text-2xl font-bold"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
             >
-              <ChevronLeft size={22} />
-            </button>
-            <button
-              onClick={() => {
-                switch (view) {
-                  case "Day":
-                    setCurrentDate(addDays(currentDate, 1));
-                    break;
-                  case "Week":
-                    setCurrentDate(addDays(currentDate, 7));
-                    break;
-                  case "Month":
-                    setCurrentDate(addMonths(currentDate, 1));
-                    break;
-                  case "Year":
-                    setCurrentDate(addYears(currentDate, 1));
-                    break;
-                }
-              }}
-              className="p-1 hover:bg-gray-100 rounded-[10px]"
-            >
-              <ChevronRight size={22} />
-            </button>
-          </motion.div>
-        </div>
-      </div>
+              {format(currentDate, "dd MMMM yyyy")}
+            </motion.h2>
+            <span className="text-sm text-gray-500">GMT +7</span>
+          </div>
 
-      {/* Days Header */}
-      {(view === "Day" || view === "Week") && (
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={view}
-            layout
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-            className={`grid ${view === "Day" ? "grid-cols-1" : "grid-cols-7"} gap-4 mb-4`}
-          >
-            {displayDays.map((day, i) => (
-              <motion.div
-                key={i}
-                layout
-                transition={{ layout: { duration: 0.4, ease: "easeInOut" } }}
-                className="text-start ml-[15px] "
-              >
-                <div className="text-sm text-gray-500 font-medium">
-                  {format(day, "EEE")}
-                </div>
-                <div className="text-lg font-bold">
-                  {format(day, "d")}
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </AnimatePresence>
-      )}
-
-      {/* Calendar Grid */}
-      <div className={`flex-1 ${view === "Month" || view === "Year" ? "" : "overflow-hidden"}`}>
-        {(view === "Day" || view === "Week") ? (
-          // ---------- DAY & WEEK ----------
-          <motion.div
-            key={`grid-${view}`}
-            layout
-            transition={{ layout: { duration: 0.45, ease: "easeInOut" } }}
-            className="flex h-full min-h-[600px]"
-          >
-            {/* Time column on left */}
-            <div className="w-[80px] flex flex-col border-r border-gray-200">
-              {timeSlots.map((time) => (
-                <div
-                  key={time}
-                  className="text-sm text-gray-500 border-b border-gray-100 h-[50px] flex items-start px-2"
-                >
-                  {time}
-                </div>
-              ))}
-            </div>
-
-            {/* Right side — day columns */}
-            <div
-              className={`flex-1 grid ${view === "Day" ? "grid-cols-1" : "grid-cols-7"} gap-2 relative`}
-            >
-              {displayDays.map((day, dayIndex) => (
-                <div
-                  key={dayIndex}
-                  className="relative border-l border-gray-100 h-full"
-                >
-                  {/* Time slots for drag */}
-                  {timeSlots.map((time, timeIndex) => (
-                    <div
-                      key={time}
-                      className="border-t border-gray-100 h-[50px] relative"
-                      onMouseDown={() => handleMouseDown(dayIndex, timeIndex)}
-                      onMouseEnter={() => handleMouseEnter(dayIndex, timeIndex)}
+          <div className="flex items-center gap-4">
+            <motion.div
+              layout
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-1 relative p-[3px] bg-[var(--accent)] rounded-[13px]">
+              {viewOptions.map((option) => (
+                <div key={option} className="relative">
+                  {view === option && (
+                    <motion.div
+                      layoutId="viewBackground"
+                      className="absolute inset-0 bg-white rounded-[11px]"
+                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
                     />
-                  ))}
-
-                  {/* Live drag preview */}
-                  <AnimatePresence>
-                    {dragStart && dragEnd && dayIndex === dragStart.dayIndex && (
-                      <motion.div
-                        key={`${dragStart.dayIndex}-${dragStart.timeIndex}-${dragEnd.timeIndex}`}
-                        initial={{ opacity: 0, scale: 0.97 }}
-                        animate={{
-                          opacity: 1,
-                          scale: 1,
-                          backgroundColor:
-                            dragEnd.timeIndex > dragStart.timeIndex
-                              ? "rgb(219 234 254)" // blue-100
-                              : "rgb(254 226 226)", // red-100
-                          borderLeftColor:
-                            dragEnd.timeIndex > dragStart.timeIndex
-                              ? "rgb(59 130 246)" // blue-500
-                              : "rgb(239 68 68)", // red-500
-                        }}
-                        exit={{ opacity: 0, scale: 0.97 }}
-                        transition={{
-                          duration: 0.18,
-                          ease: "easeOut",
-                        }}
-                        className="absolute p-2 rounded-lg w-[90%] left-[5%] shadow-sm border-l-4"
-                        style={{
-                          top: `${(Math.min(dragStart.timeIndex, dragEnd.timeIndex) * 100) / timeSlots.length}%`,
-                          height: `${(Math.abs(dragEnd.timeIndex - dragStart.timeIndex + 1) * 100) / timeSlots.length}%`,
-                        }}
-                      >
-                        <div className="text-sm font-medium">
-                          {dragEnd.timeIndex > dragStart.timeIndex ? "Extend Task" : "Shorten Task"}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {timeSlots[Math.min(dragStart.timeIndex, dragEnd.timeIndex)]} -{" "}
-                          {timeSlots[Math.max(dragStart.timeIndex, dragEnd.timeIndex) + 1] || "00:00"}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Duration: {Math.abs(dragEnd.timeIndex - dragStart.timeIndex) + 1}h
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-
-
-
-                  {/* Render existing tasks here */}
-                  <AnimatePresence>
-                    {events
-                      .filter((e) => e && e.date === format(day, "yyyy-MM-dd"))
-                      .map((event) => {
-                        if (!event.id) {
-                          console.warn('Event found without an ID:', event);
-                          return null;
-                        }
-                        const startHour = parseInt(event.start.split(":")[0], 10);
-                        const endHour = parseInt(event.end.split(":")[0], 10);
-                        const top = (startHour * 100) / timeSlots.length;
-                        const height = ((endHour - startHour) * 100) / timeSlots.length;
-
-                        return (
-                          <motion.div
-                            key={event.id}
-                            layout
-                            className={`${event.color} absolute p-2 rounded-lg w-[90%] left-[5%] shadow-sm hover:shadow-md cursor-pointer`}
-                            style={{ top: `${top}%`, height: `${height}%` }}
-                            onClick={() => handleEventClick(event)}
-                          >
-                            <div className="text-sm font-medium">{event.title}</div>
-                            <div className="text-xs text-gray-500">
-                              {event.start} - {event.end}
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                  </AnimatePresence>
+                  )}
+                  <button
+                    onClick={() => setView(option)}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg relative z-10 ${view === option ? "text-[#8054e9]" : "text-white"
+                      }`}
+                  >
+                    {option}
+                  </button>
                 </div>
               ))}
-            </div>
-          </motion.div>
+            </motion.div>
 
-        ) : (
-          // ---------- MONTH & YEAR ----------
-          <motion.div
-            key={`grid-${view}`}
-            layout
-            transition={{ layout: { duration: 0.45, ease: "easeInOut" } }}
-            className={`grid ${view === "Month" ? "grid-cols-7 gap-2" : "grid-cols-3 gap-6"
-              } h-full`}
-          >
-            {view === "Year" ? (
-              // Year view - show all months, each taking equal space
-              Array.from({ length: 12 }, (_, monthIndex) => {
-                const monthStart = new Date(currentDate.getFullYear(), monthIndex, 1);
-                const daysInMonth = displayDays.filter(
-                  (day) => day.getMonth() === monthIndex
-                );
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center rounded-[10px] gap-2">
+              <button
+                onClick={() => {
+                  switch (view) {
+                    case "Day":
+                      setCurrentDate(subDays(currentDate, 1));
+                      break;
+                    case "Week":
+                      setCurrentDate(subDays(currentDate, 7));
+                      break;
+                    case "Month":
+                      setCurrentDate(subMonths(currentDate, 1));
+                      break;
+                    case "Year":
+                      setCurrentDate(subYears(currentDate, 1));
+                      break;
+                  }
+                }}
+                className="p-1 hover:bg-gray-100 rounded-[10px]"
+              >
+                <ChevronLeft size={22} />
+              </button>
+              <button
+                onClick={() => {
+                  switch (view) {
+                    case "Day":
+                      setCurrentDate(addDays(currentDate, 1));
+                      break;
+                    case "Week":
+                      setCurrentDate(addDays(currentDate, 7));
+                      break;
+                    case "Month":
+                      setCurrentDate(addMonths(currentDate, 1));
+                      break;
+                    case "Year":
+                      setCurrentDate(addYears(currentDate, 1));
+                      break;
+                  }
+                }}
+                className="p-1 hover:bg-gray-100 rounded-[10px]"
+              >
+                <ChevronRight size={22} />
+              </button>
+            </motion.div>
+          </div>
+        </div>
 
-                return (
-                  <motion.div
-                    key={monthIndex}
-                    layout
-                    className="p-3 border rounded-xl bg-white shadow-sm flex flex-col"
-                  >
-                    <div className="text-lg font-bold mb-2 text-[#8054e9] text-center">
-                      {format(monthStart, "MMMM")}
-                    </div>
-                    <div className="grid grid-cols-7 gap-1 text-center mb-1">
-                      {["M", "T", "W", "T", "F", "S", "S"].map((day, i) => (
-                        <div key={i} className="text-xs text-gray-500">
-                          {day}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-7 gap-1 flex-1">
-                      {Array.from(
-                        { length: startOfMonth(monthStart).getDay() - 1 },
-                        (_, i) => (
-                          <div key={`empty-${i}`} className="h-6" />
-                        )
-                      )}
-                      {daysInMonth.map((day, i) => (
-                        <div
-                          key={i}
-                          className={`h-6 text-sm flex items-center justify-center rounded-full ${events.some(
-                            (e) => e && e.date === format(day, "yyyy-MM-dd")
-                          )
-                            ? "bg-[#8054e9] text-white"
-                            : "hover:bg-gray-100"
-                            }`}
-                        >
-                          {format(day, "d")}
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                );
-              })
-            ) : (
-              // Month view - fill full height grid
-              displayDays.map((day, dayIndex) => (
+        {/* Days Header */}
+        {(view === "Day" || view === "Week") && (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={view}
+              layout
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className={`grid ${view === "Day" ? "grid-cols-1" : "grid-cols-7"} gap-4 mb-4`}
+            >
+              {displayDays.map((day, i) => (
                 <motion.div
-                  key={dayIndex}
+                  key={i}
                   layout
-                  className={`p-2 border text-center rounded-[15px] ${format(day, "MM-yyyy") === format(currentDate, "MM-yyyy")
-                    ? "bg-[#f8f8f8] "
-                    : "bg-[#f8f8f8] "
-                    } flex flex-col`}
+                  transition={{ layout: { duration: 0.4, ease: "easeInOut" } }}
+                  className="text-start ml-[15px] "
                 >
-                  <div className="text-sm text-[#00000] font-medium mb-1">
+                  <div className="text-sm text-gray-500 font-medium">
+                    {format(day, "EEE")}
+                  </div>
+                  <div className="text-lg font-bold">
                     {format(day, "d")}
                   </div>
-                  <div className="flex-1">
-                    {events
-                      .filter((e) => e && e.date === format(day, "yyyy-MM-dd"))
-                      .map((event) => (
-                        <motion.div
-                          key={event.id}
-                          layout
-                          className={`${event.color} p-1 mb-1 rounded text-xs`}
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          onClick={() => handleEventClick(event)}
-                        >
-                          {event.title}
-                        </motion.div>
-                      ))}
-                  </div>
                 </motion.div>
-              ))
-            )}
-          </motion.div>
+              ))}
+            </motion.div>
+          </AnimatePresence>
         )}
-      </div>
 
-
-
-      {/* Edit Modal */}
-      <AnimatePresence>
-        {selectedEvent && (
-          <motion.div
-            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
+        {/* Calendar Grid */}
+        <div className={`flex-1 ${view === "Month" || view === "Year" ? "" : "overflow-hidden"}`}>
+          {(view === "Day" || view === "Week") ? (
+            // ---------- DAY & WEEK ----------
             <motion.div
-              className="bg-white p-6 rounded-2xl shadow-lg w-[90%] max-w-md"
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              key={`grid-${view}`}
+              layout
+              transition={{ layout: { duration: 0.45, ease: "easeInOut" } }}
+              className="flex h-full min-h-[600px]"
             >
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold">Edit Task</h3>
-                <button onClick={() => setSelectedEvent(null)} className="text-gray-500 hover:text-gray-700">
-                  <X size={20} />
-                </button>
+              {/* Time column on left */}
+              <div className="w-[80px] flex flex-col border-r border-gray-400/15">
+                {timeSlots.map((time) => (
+                  <div
+                    key={time}
+                    className="text-sm text-[#757575] border-b border-gray-400/0 h-[50px] flex items-start px-2"
+                  >
+                    {time}
+                  </div>
+                ))}
               </div>
 
-              <div className="space-y-3 ">
-                <h1 className="font-bold text-[14px] ">Title</h1>
-                <input
-                  type="text"
-                  value={selectedEvent.title}
-                  onChange={(e) => handleModalChange("title", e.target.value)}
-                  className="w-full text-[18px] hover:border-2 border-2 border-[#ffffff] hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2"
-                  placeholder="Task Title"
-                />
-                <div className="flex gap-3 items-center ">
-                  <h1 className="font-bold text-[14px] ">Time</h1>
-                  <input
-                    type="time"
-                    value={selectedEvent.start}
-                    onChange={(e) => handleModalChange("start", e.target.value)}
-                    className="w-full text-[18px] hover:border-2 border-2 border-[#ffffff] hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
-                  />
-                  <input
-                    type="time"
-                    value={selectedEvent.end}
-                    onChange={(e) => handleModalChange("end", e.target.value)}
-                    className="w-full text-[18px] hover:border-2 border-2 border-[#ffffff] hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
-                  />
-                </div>
-                {/* Color Picker */}
-                <div className="flex items-center gap-3 mt-2">
-                  <h1 className="font-bold text-[14px] ">Label Color</h1>
-                  {[
-                    { id: "blue", color: "bg-blue-500", classes: "bg-blue-100 border-l-4 border-blue-500" },
-                    { id: "green", color: "bg-green-500", classes: "bg-green-100 border-l-4 border-green-500" },
-                    { id: "purple", color: "bg-purple-500", classes: "bg-purple-100 border-l-4 border-purple-500" },
-                    { id: "yellow", color: "bg-yellow-500", classes: "bg-yellow-100 border-l-4 border-yellow-500" },
-                    { id: "pink", color: "bg-pink-500", classes: "bg-pink-100 border-l-4 border-pink-500" },
-                  ].map(({ id, color, classes }) => {
-                    const isSelected = selectedEvent.color === classes;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => handleModalChange("color", classes)}
-                        className={`w-6 h-6 rounded-full ${color} transition-transform duration-300 hover:scale-110 ${isSelected ? "ring-2 ring-offset-2 ring-[#8054e9]" : ""
-                          }`}
+              {/* Right side — day columns */}
+              <div
+                className={`flex-1 grid ${view === "Day" ? "grid-cols-1" : "grid-cols-7"} gap-2 relative`}
+              >
+                {displayDays.map((day, dayIndex) => (
+                  <div
+                    key={dayIndex}
+                    className="relative border-r border-gray-400/15 h-full"
+                  >
+                    {/* Time slots for drag */}
+                    {timeSlots.map((time, timeIndex) => (
+                      <DroppableSlot
+                        key={time}
+                        id={`${format(day, "yyyy-MM-dd")}|${time}`}
+                        onMouseDown={() =>
+                          handleMouseDown(dayIndex, timeIndex)
+                        }
+                        onMouseEnter={() =>
+                          handleMouseEnter(dayIndex, timeIndex)
+                        }
                       />
+                    ))}
+
+                    {/* Live drag preview */}
+                    <AnimatePresence>
+                      {dragStart && dragEnd && dayIndex === dragStart.dayIndex && (
+                        <motion.div
+                          key={`${dragStart.dayIndex}-${dragStart.timeIndex}-${dragEnd.timeIndex}`}
+                          initial={{ opacity: 0, scale: 0.97 }}
+                          animate={{
+                            opacity: 1,
+                            scale: 1,
+                            backgroundColor:
+                              dragEnd.timeIndex > dragStart.timeIndex
+                                ? "#8EC5FF" // blue-100
+                                : "#8EC5FF", // red-100
+                            borderLeftColor:
+                              dragEnd.timeIndex > dragStart.timeIndex
+                                ? "rgb(59 130 246)" // blue-500
+                                : "rgb(239 68 68)", // red-500
+                          }}
+                          exit={{ opacity: 0, scale: 0.97 }}
+                          transition={{
+                            duration: 0.18,
+                            ease: "easeOut",
+                          }}
+                          className="absolute p-2 rounded-lg w-[90%] left-[5%] shadow-sm border-l-4"
+                          style={{
+                            top: `${(Math.min(dragStart.timeIndex, dragEnd.timeIndex) * 100) / timeSlots.length}%`,
+                            height: `${(Math.abs(dragEnd.timeIndex - dragStart.timeIndex + 1) * 100) / timeSlots.length}%`,
+                          }}
+                        >
+                          <div className="text-sm font-medium"
+                            style={{
+                              // backgroundColor: "var(--bg)",
+                              color: "var(--text)",
+                            }}
+                          >
+                            {dragEnd.timeIndex > dragStart.timeIndex ? "Extend Task" : "Shorten Task"}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {timeSlots[Math.min(dragStart.timeIndex, dragEnd.timeIndex)]} -{" "}
+                            {timeSlots[Math.max(dragStart.timeIndex, dragEnd.timeIndex) + 1] || "00:00"}
+                          </div>
+                          <div className="text-xs text-gray-800">
+                            Duration: {Math.abs(dragEnd.timeIndex - dragStart.timeIndex) + 1}h
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+
+
+
+                    {/* Render existing tasks here */}
+                    <AnimatePresence>
+                      {events
+                        .filter((e) => e && e.date === format(day, "yyyy-MM-dd"))
+                        .map((event) => {
+                          if (!event.id && !event._id) {
+                            console.warn("Event found without an ID:", event);
+                            return null;
+                          }
+
+                          const startHour = parseInt(
+                            event.start.split(":")[0],
+                            10
+                          );
+
+                          const endHour = parseInt(
+                            event.end.split(":")[0],
+                            10
+                          );
+
+                          const top =
+                            (startHour * 100) / timeSlots.length;
+
+                          const height =
+                            ((endHour - startHour) * 100) /
+                            timeSlots.length;
+
+                          return (
+                            <DraggableEvent
+                              key={event._id || event.id}
+                              event={event}
+                              top={top}
+                              height={height}
+                              initialLoadDone={initialLoadDone}
+                              onClick={() => handleEventClick(event)}
+                            />
+                          );
+                        })}
+                    </AnimatePresence>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+
+          ) : (
+            // ---------- MONTH & YEAR ----------
+            <motion.div
+              key={`grid-${view}`}
+              layout
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="h-full w-full overflow-hidden rounded-[28px]"
+              style={{ backgroundColor: "var(--bg)", color: "var(--text)" }}
+            >
+              {view === "Year" ? (
+                // YEAR VIEW
+                <div className="grid grid-cols-4 gap-x-8 gap-y-10 h-full w-full p-6 overflow-y-auto">
+                  {Array.from({ length: 12 }, (_, monthIndex) => {
+                    const monthStart = new Date(currentDate.getFullYear(), monthIndex, 1);
+                    const daysInMonth = displayDays.filter(
+                      (day) => day.getMonth() === monthIndex
+                    );
+                    const startPadding = startOfMonth(monthStart).getDay(); // 0=Sun
+
+                    return (
+                      <div key={monthIndex} className="flex flex-col">
+                        {/* MONTH NAME */}
+                        <h2
+                          className="mb-3 text-base font-semibold"
+                          style={{ color: "var(--text)" }}
+                        >
+                          {format(monthStart, "MMMM")}
+                        </h2>
+
+                        {/* WEEKDAY HEADERS */}
+                        <div className="mb-1 grid grid-cols-7 text-center">
+                          {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                            <div
+                              key={i}
+                              className="text-[11px] font-medium py-0.5"
+                              style={{ color: "var(--text)", opacity: 0.45 }}
+                            >
+                              {d}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* DAY GRID */}
+                        <div className="grid grid-cols-7 text-center">
+                          {/* Leading empty cells */}
+                          {Array.from({ length: startPadding }, (_, i) => (
+                            <div key={`empty-${i}`} className="h-7" />
+                          ))}
+
+                          {daysInMonth.map((day, i) => {
+                            const isToday =
+                              format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                            const hasEvent = events.some(
+                              (e) => e && e.date === format(day, "yyyy-MM-dd")
+                            );
+
+                            return (
+                              <div
+                                key={i}
+                                className="relative flex h-7 items-center justify-center text-xs font-medium cursor-pointer transition-all duration-150 rounded-full hover:opacity-80"
+                                style={{
+                                  backgroundColor: isToday
+                                    ? "var(--accent, #2563eb)"
+                                    : "transparent",
+                                  color: isToday ? "#fff" : "var(--text)",
+                                }}
+                                onClick={() => {
+                                  setCurrentDate(day);
+                                  setView("Day");
+                                }}
+                              >
+                                {format(day, "d")}
+                                {/* Event dot */}
+                                {hasEvent && !isToday && (
+                                  <span
+                                    className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full"
+                                    style={{ backgroundColor: "var(--accent, #2563eb)" }}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
+              ) : (
+                // MONTH VIEW
+                <div className="flex h-full w-full flex-col">
+                  {/* WEEKDAY HEADERS */}
+                  <div className="grid grid-cols-7 border-b border-white/10">
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                      <div
+                        key={d}
+                        className="py-2 text-center text-[11px] font-semibold uppercase tracking-widest"
+                        style={{ color: "var(--text)", opacity: 0.4 }}
+                      >
+                        {d}
+                      </div>
+                    ))}
+                  </div>
 
-              </div>
+                  {/* DAY GRID */}
+                  <div className="grid flex-1 grid-cols-7">
+                    {displayDays.map((day, dayIndex) => {
+                      const isCurrentMonth =
+                        format(day, "MM-yyyy") === format(currentDate, "MM-yyyy");
+                      const isToday =
+                        format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
 
-              <div className="flex justify-between mt-6">
-                <button
-                  onClick={handleDelete}
-                  className="text-[18px] px-4 py-2 text-red-500  hover:bg-red-500 hover:text-white transition-all duration-200 rounded-[12px] "
-                >
-                  Delete
-                </button>
-                <button
-                  onClick={handleSave}
-                  className="text-[18px] px-5 py-2 bg-[#8054e9] text-white rounded-[12px] duration-200 hover:bg-[#6f45d2]"
-                >
-                  Save
-                </button>
-              </div>
+                      return (
+                        <motion.div
+                          key={dayIndex}
+                          layout
+                          className="relative flex flex-col border-r border-b border-white/10 p-2 min-h-[160px] transition-colors duration-200"
+                          style={{ backgroundColor: "var(--bg)", color: "var(--text)" }}
+                        >
+                          {/* DATE */}
+                          <div
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold cursor-pointer hover:ring-2 hover:ring-[var(--accent)]"
+                            style={{
+                              backgroundColor: isToday ? "var(--accent, #4f6ef7)" : "transparent",
+                              color: isToday ? "#fff" : "var(--text)",
+                              opacity: isCurrentMonth ? 1 : 0.35,
+                            }}
+                            onClick={() => {
+                              setCurrentDate(day);
+                              setView("Day");
+                            }}
+                          >
+                            {format(day, "d")}
+                          </div>
+
+                          {/* EVENTS */}
+                          <div className="flex flex-1 flex-col gap-1 overflow-hidden">
+                            {events
+                              .filter((e) => e && e.date === format(day, "yyyy-MM-dd"))
+                              .map((event) => (
+                                <motion.div
+                                  key={event.id}
+                                  layout
+                                  initial={{ opacity: 0, y: 6 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: 6 }}
+                                  transition={{ duration: 0.2 }}
+                                  onClick={() => handleEventClick(event)}
+                                  className="cursor-pointer overflow-hidden rounded-md px-2 py-1 text-[11px] font-medium shadow-sm"
+                                  style={{ backgroundColor: "var(--bg)", color: "var(--text)" }}
+                                >
+                                  <p className="truncate">{event.title || event.text}</p>
+                                </motion.div>
+                              ))}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+          )}
+        </div>
+
+
+
+        {/* Edit Modal */}
+        <AnimatePresence>
+          {selectedEvent && (
+            <motion.div
+              className="fixed inset-0 bg-black/40 flex items-center justify-center z-10"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <motion.div
+                style={{
+                  backgroundColor: "var(--bg)",
+                  color: "var(--text)",
+                }}
+                className="bg-white p-6 rounded-2xl shadow-lg w-[90%] max-w-md"
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+              >
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-bold">
+                    {selectedEvent.source === "todo"
+                      ? "Todo Task"
+                      : "Edit Task"}
+                  </h3>
+                  <button onClick={() => setSelectedEvent(null)} className="text-gray-500 hover:text-gray-700">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="space-y-3 ">
+                  <h1 className="font-bold text-[14px] ">Title</h1>
+                  <input
+                    type="text"
+                    value={selectedEvent.title || selectedEvent.text || ""}
+                    className="w-full text-[18px] hover:border-2 border-2 border-[#ffffff]/20 hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
+                    onChange={(e) => {
+                      handleModalChange("title", e.target.value);
+                      handleModalChange("text", e.target.value);
+                    }}
+                  />
+                  <div className="flex gap-3 items-center ">
+                    <h1 className="font-bold text-[14px] ">Time</h1>
+                    <input
+                      type="time"
+                      value={selectedEvent.start}
+                      onChange={(e) => handleModalChange("start", e.target.value)}
+                      className="w-full text-[18px] hover:border-2 border-2 border-[#ffffff]/20 hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
+                    />
+                    <input
+                      type="time"
+                      value={selectedEvent.end}
+                      onChange={(e) => handleModalChange("end", e.target.value)}
+                      className="w-full text-[18px] hover:border-2 border-2 border-[#ffffff]/20 hover:border-[#8054e9] transition-all duration-150 focus:border-[#8054e9] outline-none rounded-[13px] px-3 py-2 flex-1"
+                    />
+                  </div>
+                  {/* Color Picker */}
+                  <div className="flex items-center gap-3 mt-2">
+                    <h1 className="font-bold text-[14px] ">Label Color</h1>
+                    {[
+                      { id: "blue", color: "bg-blue-500", classes: "bg-blue-300 border-l-4 border-blue-500 text-black" },
+                      { id: "green", color: "bg-green-500", classes: "bg-green-300 border-l-4 border-green-500 text-black" },
+                      { id: "purple", color: "bg-purple-500", classes: "bg-purple-300 border-l-4 border-purple-500 text-black" },
+                      { id: "yellow", color: "bg-yellow-500", classes: "bg-yellow-300 border-l-4 border-yellow-500 text-black" },
+                      { id: "pink", color: "bg-pink-500", classes: "bg-pink-300 border-l-4 border-pink-500 text-black" },
+                    ].map(({ id, color, classes }) => {
+                      const isSelected = selectedEvent.color === classes;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => handleModalChange("color", classes)}
+                          className={`w-6 h-6 rounded-full ${color} transition-transform duration-300 hover:scale-110 ${isSelected ? "ring-2 ring-offset-2 ring-[#8054e9]" : ""
+                            }`}
+                        />
+                      );
+                    })}
+                  </div>
+
+                </div>
+
+                <div className="flex justify-between mt-6">
+                  <>
+                    <button
+                      onClick={handleDelete}
+                      className="text-[18px] px-4 py-2 text-red-500 hover:bg-red-500 hover:text-white transition-all duration-200 rounded-[12px]"
+                    >
+                      Delete
+                    </button>
+
+                    <button
+                      onClick={handleSave}
+                      className="text-[18px] px-5 py-2 bg-[var(--accent)] text-white rounded-[12px] duration-200 hover:bg-[var(--accent-hover)]"
+                    >
+                      Save
+                    </button>
+                  </>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </DndContext>
+
+
   );
+
+  function DroppableSlot({
+    id,
+    onMouseDown,
+    onMouseEnter,
+  }: {
+    id: string;
+    onMouseDown: () => void;
+    onMouseEnter: () => void;
+  }) {
+    const { setNodeRef, isOver } = useDroppable({
+      id,
+    });
+
+    return (
+      <div
+        ref={setNodeRef}
+        className={`
+        border-t
+        border-gray-400/15
+        h-[50px]
+        relative
+        transition-colors
+        ${isOver
+            ? "bg-blue-500/10"
+            : ""
+          }
+      `}
+        onMouseDown={onMouseDown}
+        onMouseEnter={onMouseEnter}
+      />
+    );
+  }
+
+  function DraggableEvent({
+    event,
+    top,
+    height,
+    onClick,
+  }: any) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+    } = useDraggable({
+      id: event._id || event.id,
+    });
+
+
+    const style = {
+      top: `${top}%`,
+      height: `${height}%`,
+      transform: transform
+        ? `translate3d(
+          ${transform.x}px,
+          ${transform.y}px,
+          0
+        )`
+        : undefined,
+    };
+
+    return (
+      <motion.div
+        initial={
+          !initialLoadDone
+            ? { opacity: 0 }
+            : false
+        }
+        animate={{ opacity: 1 }}
+        transition={{
+          duration: 0.2,
+          ease: "easeOut",
+        }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+        }}
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        style={style}
+        onClick={onClick}
+        className={`
+        ${event.color}
+        absolute
+        text-black
+        p-2
+        rounded-lg
+        w-[90%]
+        left-[5%]
+        shadow-sm
+        hover:shadow-md
+${event.source === "todo"
+            ? "cursor-default"
+            : "cursor-grab active:cursor-grabbing"}
+        z-10
+      `}
+      >
+        <div className="text-sm text-black font-medium">
+          {event.title || event.text}
+        </div>
+
+        <div className="text-xs text-gray-500">
+          {event.start} - {event.end}
+        </div>
+      </motion.div>
+    );
+  }
+
 }

@@ -18,17 +18,27 @@ export default function Settings() {
         return <General />;
       case "theme":
         return <Theme />;
-      case "subscription":
-        return <Subscription />;
+        // case "subscription":
+        // return <Subscription />;
       default:
         return <Account />;
     }
   };
 
   return (
-    <div className="flex w-full h-full bg-[#f8f8f8] overflow-hidden rounded-2xl">
+    <div className="flex w-full h-full bg-[#f8f8f8] overflow-hidden rounded-2xl"
+    style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
       {/* Sidebar */}
-      <div className="w-[260px] border-r border-gray-200 bg-white">
+      <div className="w-[260px] bg-white"
+      style={{
+  backgroundColor: "var(--bg)",
+  color: "var(--text)",
+}}
+>
         <Settingstoolbar onNavigate={setActiveComponent} />
       </div>
 

@@ -5,7 +5,12 @@ import { Mail, MessageSquare, LifeBuoy, BookOpen, AlertCircle } from "lucide-rea
 
 export default function HelpMe() {
   return (
-    <div className="w-full h-full bg-[#f8f8f8] text-black p-8 overflow-y-auto">
+    <div className="w-full h-full p-8 overflow-y-auto"
+      style={{
+        backgroundColor: "var(--bg)",
+        color: "var(--text)",
+      }}
+    >
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -42,12 +47,26 @@ export default function HelpMe() {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: i * 0.1 }}
-              className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm"
+              className=" rounded-xl p-4 shadow-sm"
+              style={{
+                backgroundColor: "var(--bg)",
+                color: "var(--text)",
+              }}
             >
-              <p className="text-sm font-semibold text-[#303030] mb-1">
+              <p className="text-sm font-semibold mb-1"
+                style={{
+                  backgroundColor: "var(--bg)",
+                  color: "var(--text)",
+                }}
+              >
                 {faq.q}
               </p>
-              <p className="text-sm text-gray-600">{faq.a}</p>
+              <p className="text-sm"
+                style={{
+                  backgroundColor: "var(--bg)",
+                  color: "var(--text)",
+                }}
+              >{faq.a}</p>
             </motion.div>
           ))}
         </div>
@@ -60,7 +79,11 @@ export default function HelpMe() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm"
+          className=" rounded-xl p-6 shadow-sm"
+          style={{
+            backgroundColor: "var(--bg)",
+            color: "var(--text)",
+          }}
         >
           <p className="text-sm text-gray-600 mb-3">
             Can’t find what you’re looking for? Reach out to us — we’ll respond
@@ -70,7 +93,7 @@ export default function HelpMe() {
           <div className="flex flex-col sm:flex-row gap-3">
             <motion.button
               whileTap={{ scale: 0.97 }}
-              className="flex items-center justify-center gap-2 text-sm bg-[#8054e9] text-white px-4 py-2 rounded-lg hover:bg-[#6e46cb] transition"
+              className="flex items-center justify-center gap-2 text-sm bg-[var(--accent)] text-white px-4 py-2 rounded-lg hover:bg-[var(--accent-hover)] transition"
             >
               <Mail size={16} />
               Email Support
@@ -78,7 +101,7 @@ export default function HelpMe() {
 
             <motion.button
               whileTap={{ scale: 0.97 }}
-              className="flex items-center justify-center gap-2 text-sm border border-[#8054e9] text-[#8054e9] px-4 py-2 rounded-lg hover:bg-[#8054e9]/10 transition"
+              className="flex items-center justify-center gap-2 text-sm border border-[#8054e9] text-[#8054e9] px-4 py-2 rounded-lg hover:bg-[var(--accent)]/10 transition"
             >
               <MessageSquare size={16} />
               Chat with Us
@@ -114,11 +137,25 @@ export default function HelpMe() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: i * 0.1 }}
               whileHover={{ scale: 1.03 }}
-              className="p-5 rounded-xl bg-white border border-gray-200 shadow-sm cursor-pointer hover:border-[#8054e9]/60"
+              className="p-5 rounded-xl shadow-sm cursor-pointer hover:border-[#8054e9]/60"
+              style={{
+                backgroundColor: "var(--bg)",
+                color: "var(--text)",
+              }}
             >
-              <div className="flex items-center gap-3 mb-2 text-[#8054e9]">
+              <div className="flex items-center gap-3 mb-2"
+                style={{
+                  backgroundColor: "var(--bg)",
+                  color: "var(--text)",
+                }}
+              >
                 {link.icon}
-                <span className="font-semibold text-sm text-black">
+                <span className="font-semibold text-sm"
+                  style={{
+                    backgroundColor: "var(--bg)",
+                    color: "var(--text)",
+                  }}
+                >
                   {link.title}
                 </span>
               </div>
