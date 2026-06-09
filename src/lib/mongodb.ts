@@ -11,20 +11,26 @@ if (!process.env.MONGODB_URI) {
 const uri = process.env.MONGODB_URI;
 const options = {};
 
-let client;
+let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
 if (process.env.NODE_ENV === "development") {
-  // In dev, use a global variable to avoid multiple connections
+  // In development, reuse connection across hot reloads
   if (!global._mongoClientPromise) {
     client = new MongoClient(uri, options);
-    global._mongoClientPromise = client.connect();
+    global._mongoClientPromise = client.connect().catch((err) => {
+      console.error("Failed to connect to MongoDB:", err);
+      throw err;
+    });
   }
   clientPromise = global._mongoClientPromise;
 } else {
-  // In production, create a new client for every connection
+  // In production, create single connection
   client = new MongoClient(uri, options);
-  clientPromise = client.connect();
+  clientPromise = client.connect().catch((err) => {
+    console.error("Failed to connect to MongoDB:", err);
+    throw err;
+  });
 }
 
 export default clientPromise;
