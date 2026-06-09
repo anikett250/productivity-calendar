@@ -58,8 +58,8 @@ export default function SignupPage() {
         <div className="min-h-screen flex items-center justify-center bg-white px-4">
             <div className="w-full max-w-md">
                 <div className="bg-white shadow-md rounded-2xl px-8 py-10">
-                    <h1 className="text-2xl font-extrabold mb-2">Welcome!</h1>
-                    <p className="text-sm text-gray-500 mb-6">
+                    <h1 className="text-2xl text-black font-extrabold mb-2">Welcome!</h1>
+                    <p className="text-sm text-black text-gray-500 mb-6">
                         Please enter your signup details below
                     </p>
 
@@ -77,7 +77,7 @@ export default function SignupPage() {
                                 onChange={(e) => setFirstname(e.target.value)}
                                 required
                                 disabled={loading}
-                                className="w-full px-4 py-3 border border-gray-200 hover:border-[#8054e9] transition-all rounded-[13px] focus:outline-none focus:ring-2 focus:ring-gray-100 disabled:opacity-50"
+                                className="w-full px-4 py-3 text-black border border-gray-200 hover:border-[#8054e9] transition-all rounded-[13px] focus:outline-none focus:ring-2 focus:ring-gray-100 disabled:opacity-50"
                             />
                             <input
                                 type="text"
@@ -86,7 +86,7 @@ export default function SignupPage() {
                                 onChange={(e) => setLastname(e.target.value)}
                                 required
                                 disabled={loading}
-                                className="w-full px-4 py-3 border border-gray-200 hover:border-[#8054e9] transition-all rounded-[13px] focus:outline-none focus:ring-2 focus:ring-gray-100 disabled:opacity-50"
+                                className="w-full px-4 py-3 text-black border border-gray-200 hover:border-[#8054e9] transition-all rounded-[13px] focus:outline-none focus:ring-2 focus:ring-gray-100 disabled:opacity-50"
                             />
                         </div>
 
@@ -98,7 +98,7 @@ export default function SignupPage() {
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
                                 disabled={loading}
-                                className="w-full px-4 py-3 border border-gray-200 hover:border-[#8054e9] transition-all rounded-[13px] focus:outline-none focus:ring-2 focus:ring-gray-100 disabled:opacity-50"
+                                className="w-full px-4 py-3 border text-black border-gray-200 hover:border-[#8054e9] transition-all rounded-[13px] focus:outline-none focus:ring-2 focus:ring-gray-100 disabled:opacity-50"
                             />
                         </div>
 
@@ -110,7 +110,7 @@ export default function SignupPage() {
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                                 disabled={loading}
-                                className="w-full px-4 py-3 border border-gray-200 hover:border-[#8054e9] transition-all rounded-[13px] focus:outline-none focus:ring-2 focus:ring-gray-100 disabled:opacity-50"
+                                className="w-full px-4 py-3 border text-black border-gray-200 hover:border-[#8054e9] transition-all rounded-[13px] focus:outline-none focus:ring-2 focus:ring-gray-100 disabled:opacity-50"
                             />
                         </div>
 
@@ -134,7 +134,7 @@ export default function SignupPage() {
                             <button
                                 type="button"
                                 onClick={() => window.location.href = '/api/auth/signin/google'}
-                                className="w-full flex items-center justify-center gap-3 border border-gray-200 py-3 rounded-[13px] bg-white text-sm hover:bg-gray-50"
+                                className="w-full flex items-center text-black justify-center gap-3 border border-gray-200 py-3 rounded-[13px] bg-white text-sm hover:bg-gray-50"
                             >
                                 <svg width="18" height="18" viewBox="0 0 48 48">
                                     <path fill="#FBBC05" d="M9.83 24c0-1.52.25-2.98.7-4.36L2.62 13.6A23.8 23.8 0 0 0 .21 24c0 3.74.87 7.26 2.41 10.39l7.9-6.05A14.14 14.14 0 0 1 9.83 24Z" />

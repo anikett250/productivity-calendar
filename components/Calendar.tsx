@@ -171,7 +171,11 @@ export default function Calendar() {
         const eventsRes = await fetch("/api/events");
         const eventsData = await eventsRes.json();
 
-        const calendarEvents = eventsData.map((event: CalendarEvent) => ({
+        const calendarEvents = (
+          Array.isArray(eventsData)
+            ? eventsData
+            : eventsData.events || []
+        ).map((event: CalendarEvent) => ({
           ...event,
           source: "event",
         }));

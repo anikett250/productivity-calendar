@@ -1,9 +1,13 @@
+import dns from "dns";
+
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
+
 import { MongoClient } from "mongodb";
 
 declare global {
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
-
+console.log("MONGODB_URI exists:", !!process.env.MONGODB_URI);
 if (!process.env.MONGODB_URI) {
   throw new Error("Please add your Mongo URI to .env.local");
 }
