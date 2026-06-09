@@ -17,13 +17,22 @@ interface Break {
 }
 
 interface Todo {
-    id: string;
-    text: string;
+    id?: string;
+    _id?: string;
+    text?: string;
+    title?: string;
     completed: boolean;
     comments: number;
     time: string | number;
     date: string;
     label: string;
+    start?: string;
+    end?: string;
+}
+
+interface ApiResponse {
+    tasks?: unknown[];
+    [key: string]: unknown;
 }
 
 export default function TimerComponent() {
@@ -39,12 +48,12 @@ export default function TimerComponent() {
     const [setupComplete, setSetupComplete] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState(false);
 
-    const parseApiResponse = async (res: Response) => {
+    const parseApiResponse = async (res: Response): Promise<Todo[]> => {
         if (!res.ok) return [];
-        const data = await res.json();
+        const data = await res.json() as ApiResponse | Todo[];
 
-        if (Array.isArray(data)) return data;
-        if (Array.isArray((data as any).tasks)) return (data as any).tasks;
+        if (Array.isArray(data)) return data as Todo[];
+        if (data.tasks && Array.isArray(data.tasks)) return data.tasks as Todo[];
         return [];
     };
 
@@ -66,7 +75,7 @@ export default function TimerComponent() {
         return diff;
     };
 
-    const getTaskTimeValue = (task: any): string | number => {
+    const getTaskTimeValue = (task: Todo): string | number => {
         if (task.time !== undefined && task.time !== null && task.time !== "") {
             return task.time;
         }
@@ -88,13 +97,13 @@ export default function TimerComponent() {
             ]);
 
             const today = format(new Date(), 'yyyy-MM-dd');
-            const combined = [...todosData, ...tasksData].filter((t: any) => {
+            const combined = [...todosData, ...tasksData].filter((t: Todo) => {
                 if (!t.date) return false;
                 const parsed = new Date(t.date);
                 return format(parsed, 'yyyy-MM-dd') === today;
             });
 
-            setTodos(combined.map((t: any) => ({
+            setTodos(combined.map((t: Todo) => ({
                 id: t._id ? String(t._id) : String(t.id),
                 text: t.text || t.title || "Untitled task",
                 completed: Boolean(t.completed),

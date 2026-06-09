@@ -93,9 +93,16 @@ export const authOptions: NextAuthOptions = {
             updatedAt: new Date(),
           };
 
-          await usersCollection.insertOne(newUser);
+          const result = await usersCollection.insertOne(newUser);
 
-          existingUser = newUser;
+          // Fetch the inserted user to get the _id
+          existingUser = await usersCollection.findOne({
+            _id: result.insertedId,
+          });
+          
+          if (!existingUser) {
+            return false;
+          }
         }
 
         // attach custom userId

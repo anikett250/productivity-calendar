@@ -51,20 +51,6 @@ export async function POST(req: NextRequest) {
     // Insert Todo
     const result = await db.collection("todos").insertOne(newTodo);
 
-    // If Todo has start & end, also create a matching calendar event (linked to user)
-    if (data.start && data.end) {
-      const calendarEvent = {
-        userId,
-        id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        title: data.text,
-        start: data.start,
-        end: data.end,
-        date: new Date().toISOString().split("T")[0],
-        color: "bg-blue-100 border-l-4 border-blue-500",
-        createdAt: new Date(),
-      };
-    }
-
     return NextResponse.json({ ...newTodo, _id: result.insertedId }, { status: 201 });
   } catch (err) {
     console.error("POST /api/todos error:", err);

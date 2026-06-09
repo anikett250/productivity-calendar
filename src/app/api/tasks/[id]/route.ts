@@ -4,9 +4,10 @@ import { ObjectId } from "mongodb";
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await req.json();
 
     const client = await clientPromise;
@@ -15,7 +16,7 @@ export async function PUT(
 
     const result = await db.collection("tasks").findOneAndUpdate(
       {
-        _id: new ObjectId(params.id),
+        _id: new ObjectId(id),
       },
       {
         $set: {

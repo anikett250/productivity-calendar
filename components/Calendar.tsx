@@ -16,7 +16,7 @@ import {
 } from "@dnd-kit/core";
 
 interface CalendarEvent {
-  id?: string;
+  id: string;
   _id?: string;
 
   title?: string;
@@ -162,7 +162,7 @@ export default function Calendar() {
         const tasks = (Array.isArray(tasksData)
           ? tasksData
           : tasksData.tasks || []
-        ).map((task: any) => ({
+        ).map((task: CalendarEvent) => ({
           ...task,
           source: "task",
         }));
@@ -171,7 +171,7 @@ export default function Calendar() {
         const eventsRes = await fetch("/api/events");
         const eventsData = await eventsRes.json();
 
-        const calendarEvents = eventsData.map((event: any) => ({
+        const calendarEvents = eventsData.map((event: CalendarEvent) => ({
           ...event,
           source: "event",
         }));
@@ -181,8 +181,8 @@ export default function Calendar() {
         const todosData = await todosRes.json();
 
         const todos = todosData
-          .filter((todo: any) => todo.start && todo.end)
-          .map((todo: any) => ({
+          .filter((todo: CalendarEvent) => todo.start && todo.end)
+          .map((todo: CalendarEvent) => ({
             ...todo,
             source: "todo",
             color:
@@ -1037,8 +1037,15 @@ export default function Calendar() {
     event,
     top,
     height,
+    initialLoadDone,
     onClick,
-  }: any) {
+  }: {
+    event: CalendarEvent;
+    top: number;
+    height: number;
+    initialLoadDone: boolean;
+    onClick: () => void;
+  }) {
     const {
       attributes,
       listeners,
