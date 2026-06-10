@@ -1,19 +1,17 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-export function middleware(request: NextRequest) {
-  const path = request.nextUrl.pathname;
+export async function middleware(req: NextRequest) {
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
 
-  // Check for user_session cookie (from custom login) or NextAuth session token
-  const userSession = request.cookies.get("user_session")?.value;
-  const nextAuthToken = request.cookies.get("next-auth.session-token")?.value;
+  const userSession = req.cookies.get("user_session")?.value;
 
-  // If trying to access protected routes
-  if (path.startsWith("/calendar")) {
-    // Allow if either session exists
-    if (!userSession && !nextAuthToken) {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
+  if (!token && !userSession) {
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
   return NextResponse.next();
