@@ -8,11 +8,7 @@ export async function middleware(req: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET,
   });
 
-  const userSession = req.cookies.get("user_session")?.value;
-
-  if (!token && !userSession) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
+  console.log("MIDDLEWARE TOKEN:", token);
 
   return NextResponse.next();
 }
